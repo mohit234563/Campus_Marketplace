@@ -1,7 +1,10 @@
-const user=require('../controllers/usersControll')
 const express=require('express');
 const router=express.Router();
+const {totalUsers,userProfile}=require('../controllers/usersControll')
+const authmiddleware=require('../middleware/authmiddleware')
 
-router.get('/totalUsers',user.totalUsers);
+
+router.get('/totalUsers',totalUsers);
+router.get('/profile',authmiddleware,userProfile);
 
 module.exports=router;
