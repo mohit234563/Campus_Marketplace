@@ -7,14 +7,14 @@ const productSchema=new mongoose.Schema(
         description:{type:String},
         category:{type:String,required:true},
         seller:{type:mongoose.Schema.Types.ObjectId,
-            ref:'users',
+            ref:'User',
             required:true
         },
         created_at:{type:Date,default:Date.now()},
-        images:{type:[String],validate:[ArrayLimits,'{PATH} exceeds the limit of 3']}
+        images:{type:[String],default:[]},
+        isSold:{type:Boolean,default:false},
+        sold_at:{type:Date}
     }
 )
-function ArrayLimits(val){
-    return val.lenght<=3
-}
+
 module.exports = mongoose.model('Product', productSchema);
