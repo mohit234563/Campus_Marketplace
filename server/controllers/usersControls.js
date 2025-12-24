@@ -1,7 +1,7 @@
 const User =require('../models/Users');
 const Order=require('../models/Orders');
 const Product=require('../models/Product');
-
+const bcrypt=require('bcrypt');
 
 //all the user profile data stored in Db exept password
 const userProfile=async(req,res)=>{
@@ -17,24 +17,36 @@ const userProfile=async(req,res)=>{
     }
 }
 //gives the order/ purchase history of the users 
-const userHistory=async(req,res)=>{
-    try{
-     const user = await Order.find({ buyer: req.userId })
-      .populate('products.product')   // populate product info
-      .populate('seller', 'name email'); // populate seller info
-        if(!user){
-            return res.status(404).json({message:"Not transaction yet"})
+const userHistory = async (req, res) => {
+    try {
+        // Ensure you use the ID from your auth middleware
+        const userId = req.userId; 
+
+        // 1. Find orders where the current user is the buyer
+        const orders = await Order.find({ buyer: userId })
+            .populate('product')             // Fixed: matches your schema field 'product'
+            .populate('seller', 'name email'); // Populate seller's name and email
+
+        // 2. Logic check: find() returns [] if no orders are found
+        if (orders.length === 0) {
+            return res.status(404).json({ message: "No transaction history found" });
         }
-        res.status(200).json({message:"orders: ",user})
-    }catch(err){
-        console.error("error while fetching order history",err.message);
-        res.status(500).json("server error");
+
+        // 3. Success response
+        res.status(200).json({ 
+            message: "Orders fetched successfully", 
+            orders 
+        });
+
+    } catch (err) {
+        console.error("Error while fetching order history:", err.message);
+        res.status(500).json({ message: "Server error" });
     }
-}
+};
 //Edit profile functionality
 const editProfile=async(req,res)=>{
     try{
-    const userId=req.user.id;
+    const userId=req.userId;
     const{name,phone,address,avatar,password}=req.body;
     const updateData={}
     if(name)updateData.name=name;
@@ -56,13 +68,5 @@ const editProfile=async(req,res)=>{
     res.status(500).json({message:"server error while editing profile"});
 }
 }
-
-
-
-
-
 module.exports={userProfile,userHistory,editProfile}
-//remaining function which i want to add later -->
-//edit item
-//delete item
-//product listing
+
