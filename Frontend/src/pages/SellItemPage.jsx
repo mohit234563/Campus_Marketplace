@@ -1,41 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, 
-  Tag, 
-  LayoutList, 
-  FileText, 
-  DollarSign, 
-  ShieldCheck, 
-  Image as ImageIcon,
-  Upload,
-  X 
+  ArrowLeft, Tag, LayoutList, FileText, 
+  DollarSign, Image as ImageIcon, Upload, X, Loader2 
 } from 'lucide-react';
 
-const sellItemPage = () => {
+const SellItemPage = () => {
+  const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
+  // Form States
   const [formData, setFormData] = useState({
     title: '',
     category: '',
     description: '',
     price: '',
-    condition: ''
   });
+  
+  const [images, setImages] = useState([]); // Real file objects
+  const [previews, setPreviews] = useState([]); // Browser preview URLs
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const categories = ['Textbooks', 'Electronics', 'Clothing', 'Accessories', 'Sports', 'Bikes'];
-  const conditions = ['New', 'Like New', 'Excellent', 'Good', 'Fair'];
-  const navigate=useNavigate(); 
-    const handleBackButton=(e)=>{
-      e.preventDefault();
-      navigate('/home');
+
+  // Handle Text Changes
+  const handleChange = (e) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  // Handle Image Selection
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (images.length + files.length > 3) {
+      alert("Maximum 3 photos allowed");
+      return;
     }
+
+    setImages(prev => [...prev, ...files]);
+
+    // Generate local previews
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setPreviews(prev => [...prev, ...newPreviews]);
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleBackButton = () => navigate('/home');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (images.length === 0) return setError("Please upload at least one photo.");
+    
+    setIsSubmitting(true);
+    setError('');
+
+    const token = localStorage.getItem('token');
+
+    try {
+      // Logic Note: Since we have files, a real app would use FormData 
+      // or upload to Cloudinary first. Here, we send the text data.
+      const response = await fetch('http://localhost:5000/api/users/sellItem', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({
+          ...formData,
+          // Sending placeholder URLs because we aren't using a cloud storage service yet
+          images: ["https://via.placeholder.com/300"] 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.message || 'Listing failed');
+
+      alert("Success! Your item is listed.");
+      navigate('/home');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-3xl mx-auto">
         
-        {/* Top Navigation */}
-        <button className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors mb-6" onClick={handleBackButton}>
-          <ArrowLeft size={16} />
-          Back to Home
+        <button onClick={handleBackButton} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 mb-6">
+          <ArrowLeft size={16} /> Back to Home
         </button>
 
         <div className="mb-8">
@@ -43,30 +103,31 @@ const sellItemPage = () => {
           <p className="text-gray-500 mt-2">Fill in the details below to list your item on Campus Marketplace</p>
         </div>
 
-        {/* Form Card */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 space-y-8">
+        {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 space-y-8">
           
-          {/* Item Title */}
+          {/* Title */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <Tag size={16} className="text-gray-400" />
-              Item Title <span className="text-red-500">*</span>
+              <Tag size={16} className="text-gray-400" /> Item Title *
             </label>
             <input 
-              type="text" 
-              placeholder="e.g., MacBook Pro 2019 - 16GB RAM"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all"
+              id="title" required value={formData.title} onChange={handleChange}
+              type="text" placeholder="e.g., MacBook Pro 2019"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all"
             />
-            <p className="text-xs text-gray-400">Be specific and descriptive</p>
           </div>
 
           {/* Category */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <LayoutList size={16} className="text-gray-400" />
-              Category <span className="text-red-500">*</span>
+              <LayoutList size={16} className="text-gray-400" /> Category *
             </label>
-            <select className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all bg-white appearance-none">
+            <select 
+              id="category" required value={formData.category} onChange={handleChange}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white"
+            >
               <option value="">Select a category</option>
               {categories.map(cat => <option key={cat} value={cat.toLowerCase()}>{cat}</option>)}
             </select>
@@ -75,97 +136,77 @@ const sellItemPage = () => {
           {/* Description */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <FileText size={16} className="text-gray-400" />
-              Description <span className="text-red-500">*</span>
+              <FileText size={16} className="text-gray-400" /> Description *
             </label>
             <textarea 
-              rows="4"
-              placeholder="Describe your item's condition, features, and any important details..."
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all resize-none"
+              id="description" required value={formData.description} onChange={handleChange}
+              rows="4" placeholder="Condition, features, and details..."
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all"
             />
-            <p className="text-xs text-gray-400">Include details about condition, usage, and reason for selling</p>
           </div>
 
-          {/* Price and Condition Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                <DollarSign size={16} className="text-gray-400" />
-                Price <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <input 
-                  type="number" 
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all"
-                />
-              </div>
-              <p className="text-xs text-gray-400">Set a fair price in USD</p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                <ShieldCheck size={16} className="text-gray-400" />
-                Condition <span className="text-red-500">*</span>
-              </label>
-              <select className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all bg-white appearance-none">
-                <option value="">Select condition</option>
-                {conditions.map(cond => <option key={cond} value={cond.toLowerCase()}>{cond}</option>)}
-              </select>
-            </div>
+          {/* Price */}
+          <div className="space-y-2 max-w-[200px]">
+            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+              <DollarSign size={16} className="text-gray-400" /> Price *
+            </label>
+            <input 
+              id="price" required value={formData.price} onChange={handleChange}
+              type="number" placeholder="0.00"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none"
+            />
           </div>
 
-          {/* Photos Upload */}
+          {/* Photos */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                <ImageIcon size={16} className="text-gray-400" />
-                Photos <span className="text-red-500">*</span>
+                <ImageIcon size={16} className="text-gray-400" /> Photos *
               </label>
-              <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">0/3</span>
+              <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{images.length}/3</span>
             </div>
             
-            <p className="text-xs text-gray-400">Upload up to 3 high-quality photos of your item</p>
-            
-            <div className="w-48 aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group">
-              <Upload size={32} className="text-gray-300 group-hover:text-blue-400 mb-2" />
-              <span className="text-sm font-medium text-gray-400 group-hover:text-blue-500">Upload Photos</span>
-            </div>
-            
-            <p className="text-xs text-red-500 font-medium">At least one photo is required to list your item</p>
-          </div>
-
-          {/* Guidelines Box */}
-          <div className="bg-blue-50/50 rounded-2xl border border-blue-100 p-6 space-y-4">
-            <h4 className="font-bold text-gray-900 text-sm">Before you submit:</h4>
-            <ul className="space-y-2">
-              {['Make sure all photos are clear and well-lit', 
-                'Double-check your price and description for accuracy', 
-                'Be honest about the item\'s condition', 
-                'Respond quickly to buyer inquiries'
-              ].map((note, i) => (
-                <li key={i} className="flex items-start gap-3 text-xs text-gray-600">
-                  <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
-                  {note}
-                </li>
+            <div className="flex gap-4 flex-wrap">
+              {previews.map((src, i) => (
+                <div key={i} className="relative w-24 h-24 group">
+                  <img src={src} className="w-full h-full object-cover rounded-2xl border" alt="preview" />
+                  <button 
+                    type="button" onClick={() => removeImage(i)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               ))}
-            </ul>
+
+              {images.length < 3 && (
+                <div 
+                  onClick={() => fileInputRef.current.click()}
+                  className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
+                >
+                  <Upload size={24} className="text-gray-300" />
+                  <input type="file" hidden ref={fileInputRef} onChange={handleImageChange} accept="image/*" multiple />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <div className="flex flex-col md:flex-row gap-4 pt-4">
-            <button className="flex-1 px-6 py-4 rounded-xl border border-gray-200 font-bold text-gray-700 hover:bg-gray-50 transition-all">
+            <button type="button" onClick={handleBackButton} className="flex-1 px-6 py-4 rounded-xl border border-gray-200 font-bold text-gray-700">
               Cancel
             </button>
-            <button className="flex-[2] px-6 py-4 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-[0.98]">
-              List Item
+            <button 
+              type="submit" disabled={isSubmitting}
+              className="flex-[2] px-6 py-4 rounded-xl bg-blue-600 text-white font-bold shadow-lg flex justify-center items-center gap-2"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" /> : 'List Item'}
             </button>
           </div>
-
-        </div>
+        </form>
       </div>
     </div>
   );
 };
 
-export default sellItemPage;
+export default SellItemPage;
