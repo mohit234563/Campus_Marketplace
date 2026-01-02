@@ -5,8 +5,19 @@ import HowItWorks from '../components/HowItWorks';
 import PopularCategories from '../components/PopularCategories';
 import Testimonials from '../components/Testimonials';
 import { ArrowRight, Check } from 'lucide-react';
-
+import {useAuth} from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 const LandingPage = () => {
+  const {user}=useAuth();
+  const navigate=useNavigate();
+  const handleButton=(e)=>{
+    e.preventDefault();
+    if(user){
+      navigate('/home');
+    }else{
+      navigate('/login')
+    }
+  }
   return (
     <div className="animate-in fade-in duration-700">
       {/* 1. Hero Section (Image reference: image_b294e5.jpg) */}
@@ -36,10 +47,12 @@ const LandingPage = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10">
-            <button className="bg-white text-blue-600 px-10 py-4 rounded-xl font-bold shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2">
+            <button className="bg-white text-blue-600 px-10 py-4 rounded-xl font-bold shadow-xl hover:scale-105 transition-transform flex items-center justify-center gap-2"
+            onClick={handleButton}>
               Create Free Account <ArrowRight size={20}/>
             </button>
-            <button className="border border-blue-400 text-white px-10 py-4 rounded-xl font-bold hover:bg-white/10 transition-all">
+            <button className="border border-blue-400 text-white px-10 py-4 rounded-xl font-bold hover:bg-white/10 transition-all"
+            onClick={handleButton}>
               Browse Items
             </button>
           </div>
