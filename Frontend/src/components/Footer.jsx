@@ -16,7 +16,7 @@ const Footer = () => {
     {
       title: 'Quick Links',
     
-      links: [{name:"Browse Item",to:'/'},{name:"Sell an Item",to:'/sellItem'},{name:"My Profile",to:'/profile'},{name:"My Listings",to:'/'}]
+      links: [{name:"Browse Item",to:'/home'},{name:"Sell an Item",to:'/sellItem'},{name:"My Profile",to:'/profile'},{name:"My Listings",to:'/profile'}]
     },
     {
       title: 'Categories',

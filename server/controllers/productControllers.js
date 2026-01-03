@@ -51,7 +51,7 @@ const sellItem = async (req, res) => {
 //function for buying the item
 const buyItem = async (req, res) => {
   try {
-    const { productId,totalAmount} = req.body;
+    const { productId} = req.body;
     const buyerId = req.userId; // from JWT middleware
 
     // 1. Find product
@@ -62,13 +62,14 @@ const buyItem = async (req, res) => {
 
     // 2. Get seller from product
     const sellerId = product.seller;
-
+    if(buyerId==sellerId)
+      return res.status(403).json({message:"you can not buy your own product"});
     // 3. Create new order
     const order = new Order({
         buyer: buyerId,
         seller: sellerId,  
         product: productId,
-        totalAmount
+        totalAmount:product.price
     });
     // 4. Save order
     await order.save();
@@ -101,7 +102,7 @@ const myProducts=async(req,res)=>{
 //get all products list which are unsold
 const productList=async(req,res)=>{
   try{
-    const product=await Product.find({isSold:false})
+    const product=await Product.find({isSold:false}).populate('seller', 'name email')
     if(!product){
       return res.status(404).json({message:"No product listed yet/ Sold out"})
     }

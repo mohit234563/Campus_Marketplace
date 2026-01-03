@@ -1,15 +1,26 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {useAuth} from '../context/AuthContext';
+
 export default function Hero () {
+  const{user}=useAuth();
   const navigate=useNavigate();
   const handleButton=(e)=>{
     e.preventDefault();
-    navigate('/login')
+    if(user){
+      navigate('/home');
+    }else{
+      navigate('/login');
+    }
   }
   const handleSell=(e)=>{
     e.preventDefault();
-    navigate('/sellItem');
+    if(user){
+      navigate('/sellItem');
+    }else{
+      navigate('/login');
+    }
   }
   return (
     <section className="bg-[#0B0F19] text-white py-24 px-4 text-center relative overflow-hidden">

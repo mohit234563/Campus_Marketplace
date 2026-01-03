@@ -34,7 +34,7 @@ exports.login=async(req,res)=>{
             return res.status(400).json({message:"Invailid credentials"})
         }
         const token=jwt.sign({userId:user.id},process.env.JWT_SECRET,{expiresIn:'1h'})
-        res.status(201).json({token,message:"user login successfully"})
+        res.status(201).json({token,message:"user login successfully",user: { id: user.id, email: user.email },})
     }catch(err){
         console.error("server error",err.message)
         res.status(500).send('server error during login');

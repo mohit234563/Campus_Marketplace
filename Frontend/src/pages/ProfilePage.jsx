@@ -272,7 +272,7 @@ const EditItemInline = ({ item, token, onCancel, onUpdateSuccess }) => {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Price ($)</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Price (₹)</label>
             <input 
               type="number"
               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
@@ -331,7 +331,7 @@ const ListingCard = ({ title, price, status, image, id, onDelete, onEdit }) => (
           {status}
         </span>
       </div>
-      <p className="text-blue-600 font-black text-xl mt-1">${price}</p>
+      <p className="text-blue-600 font-black text-xl mt-1">₹{price}</p>
       {status === 'active' && (
         <div className="flex gap-4 mt-4">
           <button className="text-xs font-bold text-gray-500 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 flex items-center gap-1" onClick={onEdit}><Edit3 size={14}/> Edit</button>

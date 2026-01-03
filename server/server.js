@@ -6,7 +6,11 @@ const authroutes=require('../server/routes/authRoutes');
 const userRoutes=require('../server/routes/usersRoutes');
 const app=express();
 connectDB();
-app.use(cors({origin:'http://localhost:3000'}));
+app.use(cors({
+  origin: 'http://localhost:5173', // Allow your Vite frontend port
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true // Allowed if you decide to use cookies later
+}));
 app.use(express.json());
 app.use('/api/auth',authroutes);
 app.use('/api/users',userRoutes);

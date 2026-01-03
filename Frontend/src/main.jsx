@@ -13,7 +13,7 @@ import MainLayout from './layouts/MainLayout.jsx'
 import HomePage from './pages/HomePage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import SellItemPage from './pages/SellItemPage.jsx'
-// import EditItem from './pages/EditItem.jsx'
+
 
 const route = createBrowserRouter(
   createRoutesFromElements(
@@ -24,6 +24,7 @@ const route = createBrowserRouter(
       <Route path='login' element={<LoginForm />} />
       <Route path='profile' element={<ProfilePage />} />
       <Route path='sellItem' element={<SellItemPage />} />
+     
     </Route>
   )
 )

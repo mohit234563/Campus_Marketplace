@@ -15,7 +15,7 @@ const LandingPage = () => {
     if(user){
       navigate('/home');
     }else{
-      navigate('/login')
+      navigate('/signup')
     }
   }
   return (
