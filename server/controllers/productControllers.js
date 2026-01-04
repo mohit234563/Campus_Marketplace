@@ -6,13 +6,30 @@ const totalUsers=async(req,res)=>{
     try{
         //count total users
         let users= await User.countDocuments({});
-        res.status(200).json({"total users:":users})
+        res.status(200).json({totalUsers:users})
     }catch(err){
         console.error("error in finding the no of users",err.message);
         res.status(500).json({message:"server error while counting the users"})
     }   
 }
+const getProductStats = async (req, res) => {
+  try {
+    // 1. Count only active items
+    const activeProducts = await Product.countDocuments({ isSold: false });
 
+    // 2. Count only sold items (This is your new integration)
+    const soldProducts = await Product.countDocuments({ isSold: true });
+
+    res.status(200).json({
+      success: true,
+      totalActive: activeProducts,
+      totalSold: soldProducts,
+      combinedTotal: activeProducts + soldProducts
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching product stats", error: err.message });
+  }
+};
 //fucntion for selling the item 
 const sellItem = async (req, res) => {
     const { title, price, category, description, images } = req.body;
@@ -195,4 +212,4 @@ res.status(200).json({ message: "Item deleted successfully" });
     res.status(500).json({ message: "Server error" });
   }
 };
-module.exports={totalUsers,sellItem,buyItem,myProducts,productList,editItem,deleteItem}
+module.exports={totalUsers,getProductStats,sellItem,buyItem,myProducts,productList,editItem,deleteItem}

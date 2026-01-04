@@ -83,6 +83,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     fetchAllData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.token]);
 
   if (loading) {
