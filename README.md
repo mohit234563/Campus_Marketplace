@@ -93,7 +93,7 @@ PORT=5000
 ## 🙋‍♂️ Author
 
 **Mohit Vijayvargiya**  
-[LinkedIn](https://www.linkedin.com/in/mohit-vijay) • [GitHub](https://github.com/mohit234563)
+[LinkedIn]((https://www.linkedin.com/in/mohit-vijay-24b182291?originalSubdomain=in)) • [GitHub](https://github.com/mohit234563)
 
 ---
 
