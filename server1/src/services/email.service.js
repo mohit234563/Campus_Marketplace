@@ -131,33 +131,124 @@ const sendPasswordResetOTP = async ({ to, name, otp }) => {
 
 // sendOrderConfirmation
 // Called after a successful purchase/rental — notifies both buyer and seller
-const sendOrderConfirmation = async ({ to, recipientName, role, product, order }) => {
+const sendOrderConfirmation = async ({
+    to,
+    recipientName,
+    role,
+    product,
+    order,
+    contactInfo,  // { name, phone, email }
+    meetup,       // { location, time } — only present after seller accepts
+    extraMessage, // buyer's note — shown to seller on new request
+}) => {
     const transporter = createTransporter();
 
-    // Different message depending on whether the recipient is the buyer or seller
-    const roleMessage =
-        role === "buyer"
-            ? "Your order has been placed successfully."
-            : "Someone just purchased your listing!";
+    // ── Build role-specific content ───────────────────────────────────────
+    let heading, subtext, contactCard = "", meetupCard = "";
+
+    if (role === "buyer") {
+        // Buyer gets notified when they PLACE a request
+        heading = "Buy Request Sent! 🛒";
+        subtext = `Your request for <strong>${product.title}</strong> has been sent to the seller. Wait for them to accept.`;
+
+    } else if (role === "seller") {
+        // Seller gets notified when a buyer REQUESTS their item
+        heading = "New Buy Request! 📬";
+        subtext = `Someone wants to buy your listing <strong>${product.title}</strong>. Review and accept or decline from your dashboard.`;
+
+        // Show buyer's contact + note to seller
+        if (contactInfo) {
+            contactCard = `
+                <div class="info-card" style="border-left-color: #16A34A;">
+                    <p style="font-weight:700; color:#16A34A; margin-bottom:8px;">👤 Buyer's Contact</p>
+                    <p><strong>Name:</strong> ${contactInfo.name}</p>
+                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+                </div>
+            `;
+        }
+        if (extraMessage) {
+            contactCard += `
+                <div class="info-card" style="border-left-color: #D97706;">
+                    <p style="font-weight:700; color:#D97706; margin-bottom:4px;">💬 Buyer's Note</p>
+                    <p style="font-style:italic;">"${extraMessage}"</p>
+                </div>
+            `;
+        }
+
+    } else if (role === "buyer-confirmed") {
+        // Buyer gets notified when seller ACCEPTS — reveal seller's contact + meetup
+        heading = "Request Accepted! ✅";
+        subtext = `Great news! The seller has accepted your request for <strong>${product.title}</strong>. Here are their contact details and meetup info:`;
+
+        if (contactInfo) {
+            contactCard = `
+                <div class="info-card" style="border-left-color: #16A34A;">
+                    <p style="font-weight:700; color:#16A34A; margin-bottom:8px;">📞 Seller's Contact</p>
+                    <p><strong>Name:</strong> ${contactInfo.name}</p>
+                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+                </div>
+            `;
+        }
+
+    } else if (role === "seller-confirmed") {
+        // Seller gets a copy confirming they accepted — with buyer's contact
+        heading = "You Accepted the Request 🤝";
+        subtext = `You accepted the buy request for <strong>${product.title}</strong>. Here are the buyer's contact details:`;
+
+        if (contactInfo) {
+            contactCard = `
+                <div class="info-card" style="border-left-color: #2563EB;">
+                    <p style="font-weight:700; color:#2563EB; margin-bottom:8px;">📞 Buyer's Contact</p>
+                    <p><strong>Name:</strong> ${contactInfo.name}</p>
+                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+                </div>
+            `;
+        }
+    }
+
+    // ── Meetup card — shown to both parties after acceptance ──────────────
+    if (meetup?.location) {
+        meetupCard = `
+            <div class="info-card" style="border-left-color: #7C3AED;">
+                <p style="font-weight:700; color:#7C3AED; margin-bottom:8px;">📍 Meetup Details</p>
+                <p><strong>Location:</strong> ${meetup.location}</p>
+                <p><strong>Time:</strong> ${new Date(meetup.time).toLocaleString("en-IN", {
+                    dateStyle: "long", timeStyle: "short"
+                })}</p>
+            </div>
+        `;
+    }
 
     const html = baseTemplate(`
-        <h2>${roleMessage}</h2>
-        <p>Hi <strong>${recipientName}</strong>, here are the order details:</p>
+        <h2>${heading}</h2>
+        <p>Hi <strong>${recipientName}</strong>, ${subtext}</p>
+
         <div class="info-card">
-            <p><strong>Product:</strong> ${product.productName}</p>
+            <p><strong>Product:</strong> ${product.title}</p>
             <p><strong>Category:</strong> ${product.category}</p>
             <p><strong>Amount:</strong> ₹${order.totalAmount}</p>
-            <p><strong>Order type:</strong> ${order.orderType}</p>
             <p><strong>Order ID:</strong> ${order._id}</p>
             <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
         </div>
-        <p>You can view full details in your dashboard.</p>
+
+        ${contactCard}
+        ${meetupCard}
+
+        <p style="margin-top:20px;">You can view and manage this order from your dashboard.</p>
     `);
 
     await transporter.sendMail({
         from: `"Campus Marketplace" <${process.env.SMTP_FROM}>`,
         to,
-        subject: `✅ Order ${role === "buyer" ? "confirmed" : "received"} — ${product.productName}`,
+        subject: {
+            "buyer":            `🛒 Request sent — ${product.title}`,
+            "seller":           `📬 New buy request — ${product.title}`,
+            "buyer-confirmed":  `✅ Request accepted — ${product.title}`,
+            "seller-confirmed": `🤝 You accepted — ${product.title}`,
+        }[role] || `Order update — ${product.title}`,
         html,
     });
 };
