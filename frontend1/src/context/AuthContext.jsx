@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
-        try { await authAPI.logout(); } catch {}
+        try { await authAPI.logout(); } catch { /* empty */ }
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");

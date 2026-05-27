@@ -2,7 +2,9 @@ import  { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
+    // eslint-disable-next-line no-unused-vars
     ShoppingBag, Plus, User, LogOut, LogIn,
+    // eslint-disable-next-line no-unused-vars
     Menu, X, Bell, Search, ChevronDown, Package, Star
 } from "lucide-react";
 
@@ -26,6 +28,7 @@ const Navbar = () => {
     }, []);
 
     // Close mobile menu on route change
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
     const handleLogout = async () => {
