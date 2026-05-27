@@ -5,24 +5,25 @@ import { Product } from "../models/product.model.js";
 import { Order } from "../models/order.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
+// ─────────────────────────────────────────────────────────────────────────────
 // LIST PRODUCT (Create)
 // Seller posts a new listing with up to 5 images
 // Images are uploaded to Cloudinary via Multer (upload.array("images", 5))
-
+// ─────────────────────────────────────────────────────────────────────────────
 const listProduct = asyncHandler(async (req, res) => {
     const { title, description, price, category, condition, listingType, rentalPricePerDay } = req.body;
 
-    // ── Validate required fields 
+    // ── Validate required fields ───────────────────────────────────────────
     if (!title || !price || !category) {
         throw new ApiError(400, "Title, price, and category are required");
     }
 
-    // ── Validate rental-specific fields 
+    // ── Validate rental-specific fields ───────────────────────────────────
     if (listingType === "rent" && !rentalPricePerDay) {
         throw new ApiError(400, "Rental price per day is required for rental listings");
     }
 
-    // ── Handle image uploads
+    // ── Handle image uploads ───────────────────────────────────────────────
     // req.files is set by upload.array("images", 5) middleware in routes
     // Each file has a .path property pointing to the temp file on disk
     if (!req.files || req.files.length === 0) {
@@ -39,7 +40,7 @@ const listProduct = asyncHandler(async (req, res) => {
     const images = uploadResults.map((r) => r.url);
     const imagePublicIds = uploadResults.map((r) => r.public_id);
 
-    // ── Create product 
+    // ── Create product ────────────────────────────────────────────────────
     const product = await Product.create({
         title: title.trim(),
         description: description?.trim() || "",
@@ -58,11 +59,12 @@ const listProduct = asyncHandler(async (req, res) => {
         .json(new ApiResponse(201, { product }, "Product listed successfully"));
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // GET ALL PRODUCTS (Browse / Search)
 // Public — no auth required
 // Supports: search, category filter, condition filter, listingType filter,
 //           price range, sort, pagination
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getAllProducts = asyncHandler(async (req, res) => {
     const {
         search,         // Full-text search on title + description
@@ -76,7 +78,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
         limit = 12,     // 12 per page — good for a 3 or 4 column grid
     } = req.query;
 
-    // ── Build filter object 
+    // ── Build filter object ────────────────────────────────────────────────
     const filter = { isSold: false }; // Never show sold items in browse
 
     // Full-text search — uses the { title: "text", description: "text" } index
@@ -95,7 +97,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
         if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
     }
 
-    // ── Build sort object 
+    // ── Build sort object ──────────────────────────────────────────────────
     const sortOptions = {
         newest: { createdAt: -1 },      // Recently listed first
         oldest: { createdAt: 1 },
@@ -117,11 +119,37 @@ const getAllProducts = asyncHandler(async (req, res) => {
         Product.countDocuments(filter),
     ]);
 
+    // Flag products that have a confirmed/pending order so frontend
+    // can show "Deal in Progress" badge — product is still listed but
+    // buyer should know someone is already negotiating
+    const productIds = products.map(p => p._id);
+    const activeOrders = await Order.find({
+        product: { $in: productIds },
+        status: { $in: ["pending", "confirmed"] },
+    }).select("product status orderType rentalEndDate");
+
+    const activeOrderMap = {};
+    activeOrders.forEach(o => {
+        // For rentals that are confirmed — check if rental period is still active
+        // A rental is "currently rented" if confirmed AND rentalEndDate is in the future
+        if (o.orderType === "rental" && o.status === "confirmed") {
+            const isCurrentlyRented = o.rentalEndDate && new Date(o.rentalEndDate) > new Date();
+            activeOrderMap[o.product.toString()] = isCurrentlyRented ? "rented" : "confirmed";
+        } else {
+            activeOrderMap[o.product.toString()] = o.status;
+        }
+    });
+
+    const productsWithStatus = products.map(p => ({
+        ...p.toObject(),
+        activeOrderStatus: activeOrderMap[p._id.toString()] || null,
+    }));
+
     return res.status(200).json(
         new ApiResponse(
             200,
             {
-                products,
+                products: productsWithStatus,
                 pagination: {
                     total,
                     page: parseInt(page),
@@ -135,10 +163,10 @@ const getAllProducts = asyncHandler(async (req, res) => {
     );
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // GET SINGLE PRODUCT
 // Public — shows full product detail with seller info
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getProductById = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.productId)
         .populate("seller", "username fullname avatar averageRating totalRatings college phone")
@@ -153,10 +181,11 @@ const getProductById = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, { product }, "Product fetched successfully"));
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE PRODUCT
 // Only the seller who created it can edit — verified by comparing seller field
 // Cannot edit a sold product
-// 
+// ─────────────────────────────────────────────────────────────────────────────
 const updateProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.productId).select("+imagePublicIds");
 
