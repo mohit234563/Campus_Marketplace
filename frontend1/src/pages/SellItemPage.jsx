@@ -1,4 +1,4 @@
-import  { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload, X, Loader2, Tag, Info, IndianRupee } from "lucide-react";
 import { productAPI } from "../services/api";
@@ -160,6 +160,7 @@ const SellItemPage = () => {
                             placeholder="Describe the condition, any defects, edition, original price..."
                             className="input resize-none" value={form.description} onChange={handleChange} />
                     </div>
+
 
                     {/* Images */}
                     <div className="space-y-3">
