@@ -197,6 +197,8 @@ const HomePage = () => {
                     </>
                 )}
             </div>
+            {/* Floating AI chat assistant — visible to logged in users */}
+            {/* {user && <AIChatWidget />} */}
         </div>
     );
 };
@@ -205,6 +207,11 @@ const HomePage = () => {
 const ProductCard = ({ product }) => {
     const [flipped, setFlipped] = useState(false);
     const [ordering, setOrdering] = useState(false);
+    // Rental modal state — only shown for listingType === "rent"
+    const [showRentalModal, setShowRentalModal] = useState(false);
+    const [rentalDates, setRentalDates] = useState({ rentalStartDate: "", rentalEndDate: "" });
+    const [buyerNote, setBuyerNote] = useState("");
+    const [rentalError, setRentalError] = useState("");
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -213,21 +220,163 @@ const ProductCard = ({ product }) => {
         "good": "badge-blue", "fair": "badge-amber", "poor": "badge-red"
     };
 
-    const handleBuy = async (e) => {
+    // Calculate rental cost preview
+    const rentalDays = rentalDates.rentalStartDate && rentalDates.rentalEndDate
+        ? Math.max(0, Math.ceil(
+            (new Date(rentalDates.rentalEndDate) - new Date(rentalDates.rentalStartDate))
+            / (1000 * 60 * 60 * 24)
+          ))
+        : 0;
+    const rentalTotal = rentalDays * (product.rentalPricePerDay || 0);
+
+    const handleBuy = (e) => {
         e.stopPropagation();
         if (!user) return navigate("/login");
+        // Rental listings need dates — show modal instead of direct request
+        if (product.listingType === "rent") {
+            setShowRentalModal(true);
+        } else {
+            submitOrder({});
+        }
+    };
+
+    const submitOrder = async ({ rentalStartDate, rentalEndDate, note }) => {
         setOrdering(true);
         try {
-            await orderAPI.create({ productId: product._id, buyerNote: "" });
+            await orderAPI.create({
+                productId: product._id,
+                buyerNote: note || "",
+                ...(rentalStartDate && { rentalStartDate, rentalEndDate }),
+            });
+            setShowRentalModal(false);
             navigate("/orders");
         } catch (err) {
-            alert(err.message);
+            if (showRentalModal) {
+                setRentalError(err.message);
+            } else {
+                alert(err.message);
+            }
         } finally {
             setOrdering(false);
         }
     };
 
+    const handleRentalSubmit = (e) => {
+        e.preventDefault();
+        setRentalError("");
+        if (!rentalDates.rentalStartDate || !rentalDates.rentalEndDate) {
+            return setRentalError("Please select both start and end dates.");
+        }
+        if (new Date(rentalDates.rentalEndDate) <= new Date(rentalDates.rentalStartDate)) {
+            return setRentalError("End date must be after start date.");
+        }
+        if (new Date(rentalDates.rentalStartDate) < new Date()) {
+            return setRentalError("Start date cannot be in the past.");
+        }
+        submitOrder({
+            rentalStartDate: rentalDates.rentalStartDate,
+            rentalEndDate: rentalDates.rentalEndDate,
+            note: buyerNote,
+        });
+    };
+
     return (
+        <>
+        {/* Rental Date Picker Modal */}
+        {showRentalModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+                style={{ background: "rgba(0,0,0,0.5)" }}
+                onClick={(e) => { if (e.target === e.currentTarget) setShowRentalModal(false); }}>
+                <div className="w-full max-w-sm rounded-3xl p-6 animate-fade-up"
+                    style={{ background: "var(--c-white)", boxShadow: "var(--shadow-hover)" }}>
+
+                    {/* Modal Header */}
+                    <div className="flex items-start justify-between mb-5">
+                        <div>
+                            <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "1.1rem", color: "var(--c-ink)" }}>
+                                Request Rental
+                            </h3>
+                            <p className="mt-1 line-clamp-1" style={{ fontSize: "0.8rem", color: "var(--c-ink-light)" }}>
+                                {product.title}
+                            </p>
+                        </div>
+                        <button onClick={() => setShowRentalModal(false)}
+                            className="p-1 rounded-lg hover:bg-gray-100 transition-all"
+                            style={{ color: "var(--c-ink-light)" }}>
+                            ✕
+                        </button>
+                    </div>
+
+                    {/* Price info */}
+                    <div className="p-3 rounded-xl mb-4 flex items-center justify-between"
+                        style={{ background: "var(--c-accent-light)" }}>
+                        <p style={{ fontSize: "0.8rem", color: "var(--c-accent)", fontWeight: 600 }}>
+                            ₹{product.rentalPricePerDay}/day
+                        </p>
+                        {rentalDays > 0 && (
+                            <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--c-accent)", fontFamily: "var(--font-display)" }}>
+                                {rentalDays} day{rentalDays > 1 ? "s" : ""} = ₹{rentalTotal.toLocaleString()}
+                            </p>
+                        )}
+                    </div>
+
+                    <form onSubmit={handleRentalSubmit} className="space-y-3">
+                        <div className="space-y-1">
+                            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                Start Date
+                            </label>
+                            <input type="date"
+                                className="input text-sm"
+                                min={new Date().toISOString().split("T")[0]}
+                                value={rentalDates.rentalStartDate}
+                                onChange={e => setRentalDates(d => ({ ...d, rentalStartDate: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                End Date
+                            </label>
+                            <input type="date"
+                                className="input text-sm"
+                                min={rentalDates.rentalStartDate || new Date().toISOString().split("T")[0]}
+                                value={rentalDates.rentalEndDate}
+                                onChange={e => setRentalDates(d => ({ ...d, rentalEndDate: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                Message to seller <span style={{ fontWeight: 400, color: "var(--c-ink-light)" }}>(optional)</span>
+                            </label>
+                            <textarea rows={2} className="input resize-none text-sm"
+                                placeholder="e.g. I need it for the weekend project..."
+                                value={buyerNote}
+                                onChange={e => setBuyerNote(e.target.value)} />
+                        </div>
+
+                        {rentalError && (
+                            <p className="text-xs px-1" style={{ color: "var(--c-red)" }}>
+                                {rentalError}
+                            </p>
+                        )}
+
+                        <div className="flex gap-2 pt-1">
+                            <button type="button" onClick={() => setShowRentalModal(false)}
+                                className="btn-ghost flex-1 text-sm py-2.5">
+                                Cancel
+                            </button>
+                            <button type="submit" disabled={ordering}
+                                className="btn-primary flex-[2] text-sm py-2.5 flex items-center justify-center gap-2">
+                                {ordering
+                                    ? <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                                    : <><ShoppingBag size={14} /> Send Request</>
+                                }
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
+
         <div className="h-[380px]" style={{ perspective: "1000px" }}>
             <div className="relative w-full h-full transition-all duration-500"
                 style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
@@ -274,11 +423,20 @@ const ProductCard = ({ product }) => {
                         <div className="flex gap-2 mt-3">
                             <button onClick={() => setFlipped(true)}
                                 className="flex-1 btn-ghost text-xs py-2.5">Details</button>
-                            <button onClick={handleBuy} disabled={ordering}
-                                className="flex-[1.5] btn-primary text-xs py-2.5 flex items-center justify-center gap-1">
-                                {ordering ? <Loader2 size={13} className="animate-spin" /> : <ShoppingBag size={13} />}
-                                {ordering ? "..." : "Request"}
-                            </button>
+                            {product.activeOrderStatus ? (
+                                <div className="flex-[1.5] flex items-center justify-center text-xs font-semibold rounded-xl py-2.5"
+                                    style={{ background: "var(--c-surface)", color: "var(--c-ink-light)", fontFamily: "var(--font-display)" }}>
+                                    {product.activeOrderStatus === "rented"    ? "🔒 Currently Rented" :
+                                     product.activeOrderStatus === "confirmed" ? "🤝 Deal On" :
+                                     "⏳ Pending"}
+                                </div>
+                            ) : (
+                                <button onClick={handleBuy} disabled={ordering}
+                                    className="flex-[1.5] btn-primary text-xs py-2.5 flex items-center justify-center gap-1">
+                                    {ordering ? <Loader2 size={13} className="animate-spin" /> : <ShoppingBag size={13} />}
+                                    {ordering ? "..." : "Request"}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -335,6 +493,7 @@ const ProductCard = ({ product }) => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
 
