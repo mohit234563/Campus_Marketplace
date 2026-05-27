@@ -1,27 +1,57 @@
 import nodemailer from "nodemailer";
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // TRANSPORTER
-// Created fresh per call so env vars are always current (useful in tests)
-// Configure SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM in your .env
-// For development: use Mailtrap (mailtrap.io) — it catches emails without sending them
-// For production: use Gmail, SendGrid, Resend, etc.
+// Single shared instance — reused across all sends in the same request.
+// Using one transporter instead of creating a new one per email prevents
+// the "Too many emails per second" error on Mailtrap free plan.
+// ─────────────────────────────────────────────────────────────────────────────
+let _transporter = null;
 
-const createTransporter = () =>
-    nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT, 10) || 587,
-        secure: process.env.SMTP_SECURE === "true", // true for port 465, false for 587
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-        },
+const getTransporter = () => {
+    if (!_transporter) {
+        _transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT, 10) || 587,
+            secure: process.env.SMTP_SECURE === "true",
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
+            },
+            // Pool connections — reuses SMTP connection instead of opening a new
+            // one per email. This is the main fix for the rate limit error.
+            pool: true,
+            maxConnections: 1,
+            rateDelta: 1000,    // Min 1 second between emails
+            rateLimit: 1,       // Max 1 email per rateDelta window
+        });
+    }
+    return _transporter;
+};
+
+// Small delay helper — used between back-to-back emails (e.g. buyer + seller)
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+const formatDate = (date) =>
+    new Date(date).toLocaleDateString("en-IN", {
+        weekday: "short", day: "numeric", month: "long", year: "numeric",
     });
 
+const formatDateTime = (date) =>
+    new Date(date).toLocaleString("en-IN", {
+        weekday: "short", day: "numeric", month: "long",
+        year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
 
+const daysBetween = (start, end) =>
+    Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24));
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BASE HTML TEMPLATE
-// Wraps all email bodies in a consistent branded layout
-
+// ─────────────────────────────────────────────────────────────────────────────
 const baseTemplate = (content) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -30,25 +60,47 @@ const baseTemplate = (content) => `
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     body { margin:0; padding:0; background:#f4f6f8; font-family:'Segoe UI',Arial,sans-serif; color:#333; }
-    .wrapper { max-width:600px; margin:40px auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.08); }
-    .header { background:linear-gradient(135deg,#6C63FF,#4A90E2); padding:32px; text-align:center; }
-    .header h1 { margin:0; color:#fff; font-size:24px; }
-    .header p  { margin:6px 0 0; color:rgba(255,255,255,0.85); font-size:13px; }
-    .body { padding:36px 40px; }
-    .body h2 { font-size:20px; color:#2d2d2d; }
-    .body p  { font-size:15px; line-height:1.7; color:#555; }
-    .otp-box { margin:28px auto; text-align:center; background:#f0f4ff; border:2px dashed #6C63FF; border-radius:12px; padding:24px; width:fit-content; min-width:180px; }
-    .otp-code { font-size:40px; font-weight:700; letter-spacing:10px; color:#6C63FF; }
+    .wrapper { max-width:600px; margin:40px auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .header { background:linear-gradient(135deg,#2563EB,#6C63FF); padding:32px; text-align:center; }
+    .header h1 { margin:0; color:#fff; font-size:22px; font-weight:800; letter-spacing:-0.5px; }
+    .header p  { margin:6px 0 0; color:rgba(255,255,255,0.8); font-size:13px; }
+    .body { padding:32px 36px; }
+    .body h2 { font-size:20px; color:#0D0D0F; margin-top:0; font-weight:800; }
+    .body p  { font-size:14px; line-height:1.75; color:#555; }
+    .info-card { background:#f8fafc; border-left:4px solid #2563EB; border-radius:10px; padding:16px 20px; margin:16px 0; }
+    .info-card p { margin:5px 0; font-size:13.5px; color:#444; }
+    .info-card.green  { border-left-color:#16A34A; }
+    .info-card.amber  { border-left-color:#D97706; }
+    .info-card.purple { border-left-color:#7C3AED; }
+    .info-card.red    { border-left-color:#DC2626; }
+    .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px; }
+    .otp-box { margin:24px auto; text-align:center; background:#EFF6FF; border:2px dashed #2563EB; border-radius:12px; padding:24px; width:fit-content; min-width:180px; }
+    .otp-code { font-size:40px; font-weight:800; letter-spacing:10px; color:#2563EB; }
     .otp-note { font-size:13px; color:#888; margin-top:8px; }
-    .info-card { background:#f8fafc; border-left:4px solid #6C63FF; border-radius:8px; padding:16px 20px; margin:20px 0; }
-    .info-card p { margin:6px 0; font-size:14px; }
-    .footer { background:#f8fafc; padding:20px 40px; text-align:center; font-size:12px; color:#aaa; border-top:1px solid #eee; }
+
+    /* Rental timeline */
+    .timeline { margin:20px 0; }
+    .timeline-row { display:flex; align-items:stretch; gap:0; }
+    .timeline-dot { display:flex; flex-direction:column; align-items:center; width:36px; shrink:0; }
+    .dot { width:14px; height:14px; border-radius:50%; background:#2563EB; border:2px solid #fff; box-shadow:0 0 0 2px #2563EB; margin-top:4px; }
+    .dot.green { background:#16A34A; box-shadow:0 0 0 2px #16A34A; }
+    .line { width:2px; flex:1; background:#BFDBFE; margin:4px 0; }
+    .timeline-content { flex:1; padding:4px 0 16px 12px; }
+    .timeline-content h4 { margin:0 0 2px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#6B7280; }
+    .timeline-content p { margin:0; font-size:14px; font-weight:600; color:#0D0D0F; }
+    .timeline-content small { font-size:12px; color:#9CA3AF; }
+
+    .price-summary { background:linear-gradient(135deg,#EFF6FF,#F0FDF4); border-radius:12px; padding:20px; margin:16px 0; text-align:center; }
+    .price-summary .total { font-size:28px; font-weight:800; color:#2563EB; }
+    .price-summary .breakdown { font-size:13px; color:#6B7280; margin-top:4px; }
+
+    .footer { background:#f8fafc; padding:20px 36px; text-align:center; font-size:12px; color:#aaa; border-top:1px solid #eee; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="header">
-      <h1>🎓 Campus Marketplace</h1>
+      <h1>🎓 CampusMarket</h1>
       <p>Your campus, your community</p>
     </div>
     <div class="body">${content}</div>
@@ -60,195 +112,233 @@ const baseTemplate = (content) => `
 </body>
 </html>`;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// RENTAL TIMELINE BLOCK
+// Reusable HTML block — injected into order emails when orderType === "rental"
+// ─────────────────────────────────────────────────────────────────────────────
+const rentalTimelineBlock = (order, product) => {
+    if (order.orderType !== "rental" || !order.rentalStartDate) return "";
 
-// sendVerificationOTP
-// Called from registerUser and resendVerificationOTP controllers
+    const days = daysBetween(order.rentalStartDate, order.rentalEndDate);
+    const pricePerDay = product.rentalPricePerDay || (order.totalAmount / days);
 
+    return `
+    <div class="info-card amber">
+        <p class="section-label" style="color:#D97706;">🗓️ Rental Timeline</p>
+        <div class="timeline">
+            <div class="timeline-row">
+                <div class="timeline-dot">
+                    <div class="dot"></div>
+                    <div class="line"></div>
+                </div>
+                <div class="timeline-content">
+                    <h4>Pickup / Start</h4>
+                    <p>${formatDate(order.rentalStartDate)}</p>
+                    <small>Collect from seller on this date</small>
+                </div>
+            </div>
+            <div class="timeline-row">
+                <div class="timeline-dot">
+                    <div class="dot green"></div>
+                </div>
+                <div class="timeline-content">
+                    <h4>Return / End</h4>
+                    <p>${formatDate(order.rentalEndDate)}</p>
+                    <small>Return to seller by this date</small>
+                </div>
+            </div>
+        </div>
+        <div class="price-summary">
+            <div class="total">₹${order.totalAmount.toLocaleString("en-IN")}</div>
+            <div class="breakdown">
+                ${days} day${days > 1 ? "s" : ""} × ₹${pricePerDay.toLocaleString("en-IN")}/day
+            </div>
+        </div>
+    </div>`;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEND VERIFICATION OTP
+// ─────────────────────────────────────────────────────────────────────────────
 const sendVerificationOTP = async ({ to, name, otp }) => {
-    const transporter = createTransporter();
-
     const html = baseTemplate(`
-        <h2>Welcome, ${name}! Please verify your email</h2>
-        <p>Thanks for signing up. Enter the OTP below to activate your account:</p>
+        <h2>Welcome, ${name}! 👋</h2>
+        <p>Thanks for joining CampusMarket. Enter the code below to verify your email and activate your account:</p>
         <div class="otp-box">
             <div class="otp-code">${otp}</div>
             <div class="otp-note">⏳ Expires in <strong>10 minutes</strong></div>
         </div>
-        <p>If you didn't create an account, you can safely ignore this email.</p>
+        <p style="font-size:13px; color:#9CA3AF;">If you didn't create an account, you can safely ignore this email.</p>
     `);
 
-    await transporter.sendMail({
-        from: `"Campus Marketplace" <${process.env.SMTP_FROM}>`,
-        to,
-        subject: "🔐 Verify your email — Campus Marketplace",
-        html,
+    await getTransporter().sendMail({
+        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+        to, subject: "🔐 Verify your email — CampusMarket", html,
     });
 };
 
-
-// sendWelcomeEmail
-// Called from verifyOTP after successful verification
-
+// ─────────────────────────────────────────────────────────────────────────────
+// SEND WELCOME EMAIL
+// ─────────────────────────────────────────────────────────────────────────────
 const sendWelcomeEmail = async ({ to, name }) => {
-    const transporter = createTransporter();
-
     const html = baseTemplate(`
         <h2>You're all set, ${name}! 🎉</h2>
-        <p>Your email has been verified and your Campus Marketplace account is now active.</p>
-        <p>You can now browse listings, list your own items, and connect with buyers and sellers on campus.</p>
+        <p>Your email has been verified. Your CampusMarket account is now active.</p>
+        <p>You can now browse listings, post your own items for sale or rent, and connect with fellow students on campus.</p>
     `);
 
-    await transporter.sendMail({
-        from: `"Campus Marketplace" <${process.env.SMTP_FROM}>`,
-        to,
-        subject: "🎓 Welcome to Campus Marketplace!",
-        html,
+    await getTransporter().sendMail({
+        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+        to, subject: "🎓 Welcome to CampusMarket!", html,
     });
 };
 
-// sendPasswordResetOTP
-// Called from forgotPassword controller
+// ─────────────────────────────────────────────────────────────────────────────
+// SEND PASSWORD RESET OTP
+// ─────────────────────────────────────────────────────────────────────────────
 const sendPasswordResetOTP = async ({ to, name, otp }) => {
-    const transporter = createTransporter();
-
     const html = baseTemplate(`
         <h2>Reset your password 🔑</h2>
-        <p>Hi <strong>${name}</strong>, we received a request to reset your password.</p>
+        <p>Hi <strong>${name}</strong>, we received a request to reset your password. Use the code below:</p>
         <div class="otp-box">
             <div class="otp-code">${otp}</div>
             <div class="otp-note">⏳ Expires in <strong>10 minutes</strong></div>
         </div>
-        <p>If you didn't request this, ignore this email. Your password won't change.</p>
+        <p style="font-size:13px; color:#9CA3AF;">If you didn't request this, ignore this email. Your password won't change.</p>
     `);
 
-    await transporter.sendMail({
-        from: `"Campus Marketplace" <${process.env.SMTP_FROM}>`,
-        to,
-        subject: "🔑 Password reset OTP — Campus Marketplace",
-        html,
+    await getTransporter().sendMail({
+        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+        to, subject: "🔑 Password reset OTP — CampusMarket", html,
     });
 };
 
-// sendOrderConfirmation
-// Called after a successful purchase/rental — notifies both buyer and seller
+// ─────────────────────────────────────────────────────────────────────────────
+// SEND ORDER CONFIRMATION
+// Handles all 4 roles: buyer | seller | buyer-confirmed | seller-confirmed
+// Automatically includes rental timeline when orderType === "rental"
+// ─────────────────────────────────────────────────────────────────────────────
 const sendOrderConfirmation = async ({
     to,
     recipientName,
     role,
     product,
     order,
-    contactInfo,  // { name, phone, email }
-    meetup,       // { location, time } — only present after seller accepts
-    extraMessage, // buyer's note — shown to seller on new request
+    contactInfo,    // { name, phone, email }
+    meetup,         // { location, time }
+    extraMessage,   // buyer's note — shown to seller on new request
 }) => {
-    const transporter = createTransporter();
+    const isRental = order.orderType === "rental";
 
-    // ── Build role-specific content ───────────────────────────────────────
+    // ── Build role-specific heading and subtext ────────────────────────────
     let heading, subtext, contactCard = "", meetupCard = "";
 
     if (role === "buyer") {
-        // Buyer gets notified when they PLACE a request
-        heading = "Buy Request Sent! 🛒";
-        subtext = `Your request for <strong>${product.title}</strong> has been sent to the seller. Wait for them to accept.`;
+        heading = isRental ? "Rental Request Sent! 📅" : "Buy Request Sent! 🛒";
+        subtext = `Your request for <strong>${product.title}</strong> has been sent to the seller. They will review and respond shortly.`;
 
     } else if (role === "seller") {
-        // Seller gets notified when a buyer REQUESTS their item
-        heading = "New Buy Request! 📬";
-        subtext = `Someone wants to buy your listing <strong>${product.title}</strong>. Review and accept or decline from your dashboard.`;
+        heading = isRental ? "New Rental Request! 📅" : "New Buy Request! 📬";
+        subtext = `A student wants to ${isRental ? "rent" : "buy"} your listing <strong>${product.title}</strong>. Review and accept or decline from your dashboard.`;
 
-        // Show buyer's contact + note to seller
         if (contactInfo) {
             contactCard = `
-                <div class="info-card" style="border-left-color: #16A34A;">
-                    <p style="font-weight:700; color:#16A34A; margin-bottom:8px;">👤 Buyer's Contact</p>
-                    <p><strong>Name:</strong> ${contactInfo.name}</p>
-                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
-                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
-                </div>
-            `;
+            <div class="info-card green">
+                <p class="section-label" style="color:#16A34A;">👤 Buyer's Contact</p>
+                <p><strong>Name:</strong> ${contactInfo.name}</p>
+                <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+            </div>`;
         }
         if (extraMessage) {
             contactCard += `
-                <div class="info-card" style="border-left-color: #D97706;">
-                    <p style="font-weight:700; color:#D97706; margin-bottom:4px;">💬 Buyer's Note</p>
-                    <p style="font-style:italic;">"${extraMessage}"</p>
-                </div>
-            `;
+            <div class="info-card amber">
+                <p class="section-label" style="color:#D97706;">💬 Buyer's Note</p>
+                <p style="font-style:italic;">"${extraMessage}"</p>
+            </div>`;
         }
 
     } else if (role === "buyer-confirmed") {
-        // Buyer gets notified when seller ACCEPTS — reveal seller's contact + meetup
-        heading = "Request Accepted! ✅";
-        subtext = `Great news! The seller has accepted your request for <strong>${product.title}</strong>. Here are their contact details and meetup info:`;
+        heading = isRental ? "Rental Accepted! ✅" : "Request Accepted! ✅";
+        subtext = `The seller has accepted your ${isRental ? "rental request" : "request"} for <strong>${product.title}</strong>. Here are their contact details and meetup info:`;
 
         if (contactInfo) {
             contactCard = `
-                <div class="info-card" style="border-left-color: #16A34A;">
-                    <p style="font-weight:700; color:#16A34A; margin-bottom:8px;">📞 Seller's Contact</p>
-                    <p><strong>Name:</strong> ${contactInfo.name}</p>
-                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
-                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
-                </div>
-            `;
+            <div class="info-card green">
+                <p class="section-label" style="color:#16A34A;">📞 Seller's Contact</p>
+                <p><strong>Name:</strong> ${contactInfo.name}</p>
+                <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+            </div>`;
         }
 
     } else if (role === "seller-confirmed") {
-        // Seller gets a copy confirming they accepted — with buyer's contact
-        heading = "You Accepted the Request 🤝";
-        subtext = `You accepted the buy request for <strong>${product.title}</strong>. Here are the buyer's contact details:`;
+        heading = isRental ? "You Accepted the Rental 🤝" : "You Accepted the Request 🤝";
+        subtext = `You accepted the ${isRental ? "rental request" : "buy request"} for <strong>${product.title}</strong>. Here are the buyer's contact details:`;
 
         if (contactInfo) {
             contactCard = `
-                <div class="info-card" style="border-left-color: #2563EB;">
-                    <p style="font-weight:700; color:#2563EB; margin-bottom:8px;">📞 Buyer's Contact</p>
-                    <p><strong>Name:</strong> ${contactInfo.name}</p>
-                    <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
-                    <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
-                </div>
-            `;
+            <div class="info-card" style="border-left-color:#2563EB;">
+                <p class="section-label" style="color:#2563EB;">📞 Buyer's Contact</p>
+                <p><strong>Name:</strong> ${contactInfo.name}</p>
+                <p><strong>Phone:</strong> ${contactInfo.phone || "Not provided"}</p>
+                <p><strong>Email:</strong> ${contactInfo.email || "Not provided"}</p>
+            </div>`;
         }
     }
 
-    // ── Meetup card — shown to both parties after acceptance ──────────────
+    // ── Meetup card (shown after acceptance) ──────────────────────────────
     if (meetup?.location) {
         meetupCard = `
-            <div class="info-card" style="border-left-color: #7C3AED;">
-                <p style="font-weight:700; color:#7C3AED; margin-bottom:8px;">📍 Meetup Details</p>
-                <p><strong>Location:</strong> ${meetup.location}</p>
-                <p><strong>Time:</strong> ${new Date(meetup.time).toLocaleString("en-IN", {
-                    dateStyle: "long", timeStyle: "short"
-                })}</p>
-            </div>
-        `;
+        <div class="info-card purple">
+            <p class="section-label" style="color:#7C3AED;">📍 Meetup Details</p>
+            <p><strong>Location:</strong> ${meetup.location}</p>
+            <p><strong>Time:</strong> ${formatDateTime(meetup.time)}</p>
+            ${isRental ? `<p style="font-size:12px; color:#9CA3AF; margin-top:8px;">
+                Remember: collect the item at this meetup and return it by <strong>${formatDate(order.rentalEndDate)}</strong>.
+            </p>` : ""}
+        </div>`;
     }
+
+    // ── Core order info card ──────────────────────────────────────────────
+    const orderCard = `
+    <div class="info-card">
+        <p class="section-label" style="color:#2563EB;">📦 ${isRental ? "Rental" : "Order"} Details</p>
+        <p><strong>Item:</strong> ${product.title}</p>
+        <p><strong>Category:</strong> ${product.category}</p>
+        <p><strong>Type:</strong> ${isRental ? "Rental" : "Purchase"}</p>
+        <p><strong>Amount:</strong> ₹${order.totalAmount?.toLocaleString("en-IN")}</p>
+        <p><strong>Order ID:</strong> <code style="font-size:12px; background:#f0f4ff; padding:2px 6px; border-radius:4px;">${order._id}</code></p>
+        <p><strong>Date:</strong> ${formatDate(order.createdAt)}</p>
+    </div>`;
+
+    // ── Rental timeline (only for rentals) ───────────────────────────────
+    const timeline = rentalTimelineBlock(order, product);
 
     const html = baseTemplate(`
         <h2>${heading}</h2>
         <p>Hi <strong>${recipientName}</strong>, ${subtext}</p>
-
-        <div class="info-card">
-            <p><strong>Product:</strong> ${product.title}</p>
-            <p><strong>Category:</strong> ${product.category}</p>
-            <p><strong>Amount:</strong> ₹${order.totalAmount}</p>
-            <p><strong>Order ID:</strong> ${order._id}</p>
-            <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleDateString("en-IN", { dateStyle: "long" })}</p>
-        </div>
-
+        ${orderCard}
+        ${timeline}
         ${contactCard}
         ${meetupCard}
-
-        <p style="margin-top:20px;">You can view and manage this order from your dashboard.</p>
+        <p style="margin-top:20px; font-size:13px; color:#9CA3AF;">
+            View and manage this ${isRental ? "rental" : "order"} from your dashboard.
+        </p>
     `);
 
-    await transporter.sendMail({
-        from: `"Campus Marketplace" <${process.env.SMTP_FROM}>`,
+    // Subject line
+    const subjects = {
+        "buyer":            isRental ? `📅 Rental request sent — ${product.title}` : `🛒 Request sent — ${product.title}`,
+        "seller":           isRental ? `📅 New rental request — ${product.title}` : `📬 New buy request — ${product.title}`,
+        "buyer-confirmed":  isRental ? `✅ Rental accepted — ${product.title}` : `✅ Request accepted — ${product.title}`,
+        "seller-confirmed": isRental ? `🤝 You accepted the rental — ${product.title}` : `🤝 You accepted — ${product.title}`,
+    };
+
+    await getTransporter().sendMail({
+        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
         to,
-        subject: {
-            "buyer":            `🛒 Request sent — ${product.title}`,
-            "seller":           `📬 New buy request — ${product.title}`,
-            "buyer-confirmed":  `✅ Request accepted — ${product.title}`,
-            "seller-confirmed": `🤝 You accepted — ${product.title}`,
-        }[role] || `Order update — ${product.title}`,
+        subject: subjects[role] || `Order update — ${product.title}`,
         html,
     });
 };
@@ -258,4 +348,5 @@ export {
     sendWelcomeEmail,
     sendPasswordResetOTP,
     sendOrderConfirmation,
+    delay,
 };
