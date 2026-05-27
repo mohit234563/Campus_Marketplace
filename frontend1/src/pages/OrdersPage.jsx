@@ -1,6 +1,7 @@
-import  { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { orderAPI } from "../services/api";
-import { Loader2, ShoppingBag, MapPin, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { Loader2, ShoppingBag, CheckCircle, XCircle, Clock } from "lucide-react";
 
 const STATUS_CONFIG = {
     pending:   { label: "Pending",   class: "badge-amber", icon: <Clock size={13} /> },
@@ -13,6 +14,7 @@ const OrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("");
+    const { user } = useAuth();
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -29,6 +31,14 @@ const OrdersPage = () => {
         if (!window.confirm("Cancel this request?")) return;
         try {
             await orderAPI.cancel(orderId, { cancelReason: "Buyer cancelled" });
+            fetchOrders();
+        } catch (err) { alert(err.message); }
+    };
+
+    const handleComplete = async (orderId) => {
+        if (!window.confirm("Confirm you have exchanged the item and received payment?\n\nThis will mark the product as SOLD.")) return;
+        try {
+            await orderAPI.complete(orderId);
             fetchOrders();
         } catch (err) { alert(err.message); }
     };
