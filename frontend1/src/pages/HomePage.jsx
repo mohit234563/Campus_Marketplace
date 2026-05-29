@@ -1,8 +1,10 @@
 import  { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars
 import { Search, SlidersHorizontal, Plus, Loader2, ShoppingBag, Tag, Clock, User, ChevronLeft, Star, BookOpen, Laptop, Sofa, Shirt, Pen, Dumbbell, Package } from "lucide-react";
 import { productAPI, orderAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import AIChatWidget from "../components/AIChatWidget";
 
 const CATEGORIES = [
     { label: "All", value: "", icon: <Package size={15} /> },
@@ -33,7 +35,7 @@ const HomePage = () => {
     const [sort, setSort] = useState("newest");
     const [page, setPage] = useState(1);
     const [filtersOpen, setFiltersOpen] = useState(false);
-
+     const { user } = useAuth();
     const navigate = useNavigate();
 
     const fetchProducts = useCallback(async () => {
@@ -198,7 +200,7 @@ const HomePage = () => {
                 )}
             </div>
             {/* Floating AI chat assistant — visible to logged in users */}
-            {/* {user && <AIChatWidget />} */}
+            {user && <AIChatWidget />}
         </div>
     );
 };
@@ -365,7 +367,7 @@ const ProductCard = ({ product }) => {
                                 Cancel
                             </button>
                             <button type="submit" disabled={ordering}
-                                className="btn-primary flex-[2] text-sm py-2.5 flex items-center justify-center gap-2">
+                                className="btn-primary flex-2 text-sm py-2.5 flex items-center justify-center gap-2">
                                 {ordering
                                     ? <><Loader2 size={14} className="animate-spin" /> Sending...</>
                                     : <><ShoppingBag size={14} /> Send Request</>
@@ -377,7 +379,7 @@ const ProductCard = ({ product }) => {
             </div>
         )}
 
-        <div className="h-[380px]" style={{ perspective: "1000px" }}>
+        <div className="h-95" style={{ perspective: "1000px" }}>
             <div className="relative w-full h-full transition-all duration-500"
                 style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
 

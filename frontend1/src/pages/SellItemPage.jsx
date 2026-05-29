@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import  { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload, X, Loader2, Tag, Info, IndianRupee } from "lucide-react";
 import { productAPI } from "../services/api";
 import { Field } from "./LoginPage";
+import { AIDescriptionGenerator, AIPriceSuggester } from "../components/AITools";
 
 const CATEGORIES = ["books", "electronics", "furniture", "clothing", "stationery", "sports", "other"];
 const CONDITIONS = ["new", "like-new", "good", "fair", "poor"];
@@ -162,6 +163,23 @@ const SellItemPage = () => {
                     </div>
 
 
+                    {/* AI Tools */}
+                    <div className="space-y-3">
+                        <AIDescriptionGenerator
+                            title={form.title}
+                            category={form.category}
+                            condition={form.condition}
+                            onAccept={(desc) => setForm(f => ({ ...f, description: desc }))}
+                        />
+                        <AIPriceSuggester
+                            title={form.title}
+                            category={form.category}
+                            condition={form.condition}
+                            originalPrice={form.price}
+                            onAccept={(price) => setForm(f => ({ ...f, price: price.toString() }))}
+                        />
+                    </div>
+
                     {/* Images */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -208,7 +226,7 @@ const SellItemPage = () => {
                         <button type="button" onClick={() => navigate(-1)} className="btn-ghost flex-1">
                             Cancel
                         </button>
-                        <button type="submit" disabled={loading} className="btn-primary flex-[2] flex items-center justify-center gap-2">
+                        <button type="submit" disabled={loading} className="btn-primary flex-2 flex items-center justify-center gap-2">
                             {loading ? <><Loader2 size={16} className="animate-spin" /> Uploading...</> : "List Item"}
                         </button>
                     </div>
