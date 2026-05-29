@@ -1,8 +1,8 @@
-
+// ─────────────────────────────────────────────────────────────────────────────
 // api.js — Centralized API service
 // All backend calls go through here — no scattered fetch() calls in components.
 // Automatically attaches auth token and handles token refresh on 401.
-
+// ─────────────────────────────────────────────────────────────────────────────
 
 const BASE_URL = "http://localhost:3005/api/v2";
 
@@ -38,7 +38,7 @@ const request = async (endpoint, options = {}) => {
     return data;
 };
 
-// ── Auth 
+// ── Auth ──────────────────────────────────────────────────────────────────────
 export const authAPI = {
     register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
     verifyOTP: (body) => request("/auth/verify-otp", { method: "POST", body: JSON.stringify(body) }),
@@ -50,7 +50,7 @@ export const authAPI = {
     refreshToken: (body) => request("/auth/refresh-token", { method: "POST", body: JSON.stringify(body) }),
 };
 
-// ── Users / Profile 
+// ── Users / Profile ───────────────────────────────────────────────────────────
 export const userAPI = {
     getMyProfile: () => request("/users/profile"),
     editProfile: (body) => request("/users/profile", { method: "PATCH", body: JSON.stringify(body) }),
@@ -65,7 +65,7 @@ export const userAPI = {
     submitReview: (body) => request("/users/reviews", { method: "POST", body: JSON.stringify(body) }),
 };
 
-// ── Products 
+// ── Products ──────────────────────────────────────────────────────────────────
 export const productAPI = {
     getAll: (params = "") => request(`/products${params}`),
     getById: (id) => request(`/products/${id}`),
@@ -74,7 +74,7 @@ export const productAPI = {
     delete: (id) => request(`/products/${id}`, { method: "DELETE" }),
 };
 
-// ── Orders 
+// ── Orders ────────────────────────────────────────────────────────────────────
 export const orderAPI = {
     create: (body) => request("/orders", { method: "POST", body: JSON.stringify(body) }),
     getMyOrders: (params = "") => request(`/orders/my-orders${params}`),
@@ -83,4 +83,11 @@ export const orderAPI = {
     accept: (id, body) => request(`/orders/${id}/accept`, { method: "PATCH", body: JSON.stringify(body) }),
     complete: (id) => request(`/orders/${id}/complete`, { method: "PATCH" }),
     cancel: (id, body) => request(`/orders/${id}/cancel`, { method: "PATCH", body: JSON.stringify(body) }),
+};
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+export const aiAPI = {
+    generateDescription: (body) => request("/ai/generate-description", { method: "POST", body: JSON.stringify(body) }),
+    suggestPrice:        (body) => request("/ai/suggest-price",         { method: "POST", body: JSON.stringify(body) }),
+    chat:                (body) => request("/ai/chat",                  { method: "POST", body: JSON.stringify(body) }),
 };
