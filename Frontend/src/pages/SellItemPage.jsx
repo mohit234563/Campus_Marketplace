@@ -1,212 +1,239 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, Tag, LayoutList, FileText, 
-  DollarSign, Image as ImageIcon, Upload, X, Loader2 
-} from 'lucide-react';
+import  { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Upload, X, Loader2, Tag, Info, IndianRupee } from "lucide-react";
+import { productAPI } from "../services/api";
+import { Field } from "./LoginPage";
+import { AIDescriptionGenerator, AIPriceSuggester } from "../components/AITools";
+
+const CATEGORIES = ["books", "electronics", "furniture", "clothing", "stationery", "sports", "other"];
+const CONDITIONS = ["new", "like-new", "good", "fair", "poor"];
 
 const SellItemPage = () => {
-  const navigate = useNavigate();
-  const fileInputRef = useRef(null);
+    const navigate = useNavigate();
+    const fileRef = useRef();
 
-  // Form States
-  const [formData, setFormData] = useState({
-    title: '',
-    category: '',
-    description: '',
-    price: '',
-  });
-  
-  const [images, setImages] = useState([]); // Real file objects
-  const [previews, setPreviews] = useState([]); // Browser preview URLs
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+    const [form, setForm] = useState({
+        title: "", category: "", description: "",
+        price: "", condition: "good", listingType: "sell", rentalPricePerDay: ""
+    });
+    const [images, setImages] = useState([]);     // File objects
+    const [previews, setPreviews] = useState([]); // Preview URLs
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
-  const categories = ['Textbooks', 'Electronics', 'Clothing', 'Accessories', 'Sports', 'Bikes'];
+    const handleChange = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+        if (error) setError("");
+    };
 
-  // Handle Text Changes
-  const handleChange = (e) => {
-    const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
-  };
+    const handleImages = (e) => {
+        const files = Array.from(e.target.files);
+        const remaining = 5 - images.length;
+        const toAdd = files.slice(0, remaining);
+        setImages(prev => [...prev, ...toAdd]);
+        setPreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))]);
+    };
 
-  // Handle Image Selection
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (images.length + files.length > 3) {
-      alert("Maximum 3 photos allowed");
-      return;
-    }
+    const removeImage = (i) => {
+        setImages(prev => prev.filter((_, idx) => idx !== i));
+        setPreviews(prev => prev.filter((_, idx) => idx !== i));
+    };
 
-    setImages(prev => [...prev, ...files]);
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (images.length === 0) return setError("At least one image is required.");
+        setLoading(true);
+        setError("");
 
-    // Generate local previews
-    const newPreviews = files.map(file => URL.createObjectURL(file));
-    setPreviews(prev => [...prev, ...newPreviews]);
-  };
+        try {
+            // Use FormData to send files + text together
+            const fd = new FormData();
+            Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+            images.forEach(img => fd.append("images", img));
 
-  const removeImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setPreviews(prev => prev.filter((_, i) => i !== index));
-  };
+            await productAPI.create(fd);
+            navigate("/home");
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  const handleBackButton = () => navigate('/home');
+    return (
+        <div className="min-h-screen py-10 px-4" style={{ background: "var(--c-surface)" }}>
+            <div className="max-w-2xl mx-auto">
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (images.length === 0) return setError("Please upload at least one photo.");
-    
-    setIsSubmitting(true);
-    setError('');
+                {/* Header */}
+                <button onClick={() => navigate(-1)}
+                    className="flex items-center gap-2 mb-6 text-sm font-medium transition-all"
+                    style={{ color: "var(--c-ink-light)", fontFamily: "var(--font-display)" }}>
+                    <ArrowLeft size={16} /> Back
+                </button>
 
-    const token = localStorage.getItem('token');
+                <div className="mb-8">
+                    <h1 style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "2rem", color: "var(--c-ink)" }}>
+                        List Your Item
+                    </h1>
+                    <p className="mt-2" style={{ color: "var(--c-ink-light)", fontSize: "0.9rem" }}>
+                        Fill in the details. Buyers on your campus will see this listing.
+                    </p>
+                </div>
 
-    try {
-      // Logic Note: Since we have files, a real app would use FormData 
-      // or upload to Cloudinary first. Here, we send the text data.
-      const response = await fetch('http://localhost:5000/api/users/sellItem', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({
-          ...formData,
-          // Sending placeholder URLs because we aren't using a cloud storage service yet
-          images: ["https://via.placeholder.com/300"] 
-        }),
-      });
+                {error && (
+                    <div className="mb-6 p-4 rounded-xl text-sm" style={{ background: "#FEF2F2", border: "1px solid #FEE2E2", color: "var(--c-red)" }}>
+                        {error}
+                    </div>
+                )}
 
-      const data = await response.json();
+                <form onSubmit={handleSubmit} className="card p-8 space-y-6">
 
-      if (!response.ok) throw new Error(data.message || 'Listing failed');
+                    {/* Title */}
+                    <Field label="Item Title *" icon={<Tag size={15} />}>
+                        <input name="title" required placeholder="e.g., Engineering Mathematics by RD Sharma"
+                            className="input pl-10" value={form.title} onChange={handleChange} />
+                    </Field>
 
-      alert("Success! Your item is listed.");
-      navigate('/home');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+                    {/* Category + Condition */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                Category *
+                            </label>
+                            <select name="category" required className="input" value={form.category} onChange={handleChange}>
+                                <option value="">Select category</option>
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                Condition *
+                            </label>
+                            <select name="condition" className="input" value={form.condition} onChange={handleChange}>
+                                {CONDITIONS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                            </select>
+                        </div>
+                    </div>
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-3xl mx-auto">
-        
-        <button onClick={handleBackButton} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-blue-600 mb-6">
-          <ArrowLeft size={16} /> Back to Home
-        </button>
+                    {/* Listing type */}
+                    <div className="space-y-2">
+                        <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                            Listing Type
+                        </label>
+                        <div className="flex gap-3">
+                            {["sell", "rent"].map(type => (
+                                <button key={type} type="button"
+                                    onClick={() => setForm({ ...form, listingType: type })}
+                                    className="flex-1 py-2.5 rounded-xl border font-semibold text-sm transition-all"
+                                    style={{
+                                        fontFamily: "var(--font-display)",
+                                        background: form.listingType === type ? "var(--c-accent)" : "var(--c-white)",
+                                        color: form.listingType === type ? "white" : "var(--c-ink-light)",
+                                        borderColor: form.listingType === type ? "var(--c-accent)" : "var(--c-border)",
+                                    }}>
+                                    {type === "sell" ? "Sell (One-time)" : "Rent (Per day)"}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">List Your Item</h1>
-          <p className="text-gray-500 mt-2">Fill in the details below to list your item on Campus Marketplace</p>
+                    {/* Price */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label={form.listingType === "rent" ? "Security Deposit (₹)" : "Price (₹) *"}
+                            icon={<IndianRupee size={15} />}>
+                            <input name="price" type="number" min="0" required
+                                placeholder="0" className="input pl-10" value={form.price} onChange={handleChange} />
+                        </Field>
+                        {form.listingType === "rent" && (
+                            <Field label="Rent per day (₹) *" icon={<IndianRupee size={15} />}>
+                                <input name="rentalPricePerDay" type="number" min="0" required
+                                    placeholder="0" className="input pl-10" value={form.rentalPricePerDay} onChange={handleChange} />
+                            </Field>
+                        )}
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1.5">
+                        <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                            Description
+                        </label>
+                        <textarea name="description" rows={4}
+                            placeholder="Describe the condition, any defects, edition, original price..."
+                            className="input resize-none" value={form.description} onChange={handleChange} />
+                    </div>
+
+
+                    {/* AI Tools */}
+                    <div className="space-y-3">
+                        <AIDescriptionGenerator
+                            title={form.title}
+                            category={form.category}
+                            condition={form.condition}
+                            onAccept={(desc) => setForm(f => ({ ...f, description: desc }))}
+                        />
+                        <AIPriceSuggester
+                            title={form.title}
+                            category={form.category}
+                            condition={form.condition}
+                            originalPrice={form.price}
+                            onAccept={(price) => setForm(f => ({ ...f, price: price.toString() }))}
+                        />
+                    </div>
+
+                    {/* Images */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
+                                Photos *
+                            </label>
+                            <span className="badge badge-gray">{images.length}/5</span>
+                        </div>
+
+                        <div className="flex gap-3 flex-wrap">
+                            {previews.map((src, i) => (
+                                <div key={i} className="relative w-24 h-24 rounded-2xl overflow-hidden border"
+                                    style={{ borderColor: "var(--c-border)" }}>
+                                    <img src={src} className="w-full h-full object-cover" alt="" />
+                                    <button type="button" onClick={() => removeImage(i)}
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                                        style={{ background: "var(--c-red)" }}>
+                                        <X size={10} className="text-white" />
+                                    </button>
+                                </div>
+                            ))}
+
+                            {images.length < 5 && (
+                                <button type="button" onClick={() => fileRef.current.click()}
+                                    className="w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-all hover:border-blue-400"
+                                    style={{ borderColor: "var(--c-border)" }}>
+                                    <Upload size={18} style={{ color: "var(--c-ink-light)" }} />
+                                    <span style={{ fontSize: "0.65rem", color: "var(--c-ink-light)", fontWeight: 600 }}>Upload</span>
+                                    <input type="file" hidden multiple accept="image/*" ref={fileRef} onChange={handleImages} />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: "var(--c-accent-light)" }}>
+                            <Info size={14} style={{ color: "var(--c-accent)", marginTop: 1, shrink: 0 }} />
+                            <p style={{ fontSize: "0.78rem", color: "var(--c-accent)", lineHeight: 1.5 }}>
+                                Upload clear photos from multiple angles. Good photos get more buyers.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Submit */}
+                    <div className="flex gap-3 pt-2">
+                        <button type="button" onClick={() => navigate(-1)} className="btn-ghost flex-1">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={loading} className="btn-primary flex-2 flex items-center justify-center gap-2">
+                            {loading ? <><Loader2 size={16} className="animate-spin" /> Uploading...</> : "List Item"}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
-
-        {error && <div className="mb-4 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 space-y-8">
-          
-          {/* Title */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <Tag size={16} className="text-gray-400" /> Item Title *
-            </label>
-            <input 
-              id="title" required value={formData.title} onChange={handleChange}
-              type="text" placeholder="e.g., MacBook Pro 2019"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all"
-            />
-          </div>
-
-          {/* Category */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <LayoutList size={16} className="text-gray-400" /> Category *
-            </label>
-            <select 
-              id="category" required value={formData.category} onChange={handleChange}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none bg-white"
-            >
-              <option value="">Select a category</option>
-              {categories.map(cat => <option key={cat} value={cat.toLowerCase()}>{cat}</option>)}
-            </select>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <FileText size={16} className="text-gray-400" /> Description *
-            </label>
-            <textarea 
-              id="description" required value={formData.description} onChange={handleChange}
-              rows="4" placeholder="Condition, features, and details..."
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none transition-all"
-            />
-          </div>
-
-          {/* Price */}
-          <div className="space-y-2 max-w-[200px]">
-            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-              <DollarSign size={16} className="text-gray-400" /> Price *
-            </label>
-            <input 
-              id="price" required value={formData.price} onChange={handleChange}
-              type="number" placeholder="0.00"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none"
-            />
-          </div>
-
-          {/* Photos */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                <ImageIcon size={16} className="text-gray-400" /> Photos *
-              </label>
-              <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{images.length}/3</span>
-            </div>
-            
-            <div className="flex gap-4 flex-wrap">
-              {previews.map((src, i) => (
-                <div key={i} className="relative w-24 h-24 group">
-                  <img src={src} className="w-full h-full object-cover rounded-2xl border" alt="preview" />
-                  <button 
-                    type="button" onClick={() => removeImage(i)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-
-              {images.length < 3 && (
-                <div 
-                  onClick={() => fileInputRef.current.click()}
-                  className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
-                >
-                  <Upload size={24} className="text-gray-300" />
-                  <input type="file" hidden ref={fileInputRef} onChange={handleImageChange} accept="image/*" multiple />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex flex-col md:flex-row gap-4 pt-4">
-            <button type="button" onClick={handleBackButton} className="flex-1 px-6 py-4 rounded-xl border border-gray-200 font-bold text-gray-700">
-              Cancel
-            </button>
-            <button 
-              type="submit" disabled={isSubmitting}
-              className="flex-[2] px-6 py-4 rounded-xl bg-blue-600 text-white font-bold shadow-lg flex justify-center items-center gap-2"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" /> : 'List Item'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default SellItemPage;

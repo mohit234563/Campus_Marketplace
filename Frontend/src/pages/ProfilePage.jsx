@@ -1,369 +1,781 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import EditProfilePage from './EditProfilePage'; 
+import React, { useState, useEffect, useRef } from "react";
+import { useAuth } from "../context/AuthContext";
+import { userAPI, orderAPI, productAPI } from "../services/api";
+import {
+    User, Mail, Phone, MapPin, Calendar, Edit3, Camera,
+    Package, ShoppingBag, TrendingUp, Loader2, Star,
+    Save, X, CheckCircle, XCircle, Clock, AlertCircle,
+    Trash2, Pencil, Plus, ChevronDown, ChevronUp
+} from "lucide-react";
+import { Alert } from "./SignupPage";
 
-import { 
-  User, Mail, MapPin, Phone, Calendar, Edit3, 
-  Package, ShoppingBag, Trash2, CheckCircle2, 
-  Clock, Loader2, Save, X
-} from 'lucide-react';
+// ── Tab config ────────────────────────────────────────────────────────────────
+const TABS = [
+    { key: "listings",  label: "My Listings",  icon: <Package size={15} /> },
+    { key: "purchases", label: "Purchases",     icon: <ShoppingBag size={15} /> },
+    { key: "sales",     label: "Sales",         icon: <TrendingUp size={15} /> },
+    { key: "incoming",  label: "Requests",      icon: <AlertCircle size={15} /> },
+];
 
+const statusStyle = {
+    pending:   "badge-amber",
+    confirmed: "badge-blue",
+    completed: "badge-green",
+    cancelled: "badge-red",
+};
 
+// ── CATEGORIES & CONDITIONS (for edit product form) ───────────────────────────
+const CATEGORIES = ["books","electronics","furniture","clothing","stationery","sports","other"];
+const CONDITIONS  = ["new","like-new","good","fair","poor"];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROFILE PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 const ProfilePage = () => {
-  const [activeTab, setActiveTab] = useState('listings');
-  const { user } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [myProducts, setMyProducts] = useState([]);
-  const [transaction, setTransaction] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
-  
-  // New state for inline product editing
-  const [editingProduct, setEditingProduct] = useState(null); 
+    const { user, updateUser } = useAuth();
+    const [profile, setProfile]       = useState(null);
+    const [activeTab, setActiveTab]   = useState("listings");
+    const [tabData, setTabData]       = useState([]);
+    const [loading, setLoading]       = useState(true);
+    const [tabLoading, setTabLoading] = useState(false);
 
-  // Updated handleEdit to receive the item object
-  const handleEdit = (item) => {
-    setEditingProduct(item);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+    // Edit profile state
+    const [editing, setEditing]     = useState(false);
+    const [editForm, setEditForm]   = useState({});
+    const [saving, setSaving]       = useState(false);
+    const [editError, setEditError] = useState("");
 
-  const handleDelete = async (e, id) => {
-    e.preventDefault();
-    if (!window.confirm("Are you sure?")) return;
+    // Avatar
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const avatarRef = useRef();
 
-    try {
-      const response = await fetch(`http://localhost:5000/api/users/deleteItem/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.token}`
-        }
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert('Item deleted successfully');
-        fetchAllData(); 
-      } else {
-        alert(data.message);
-      }
-    } catch (err) {
-      console.error("server error", err);
-    }
-  };
+    // ── Load own profile ──────────────────────────────────────────────────
+    useEffect(() => {
+        const fetch = async () => {
+            try {
+                const data = await userAPI.getMyProfile();
+                setProfile(data.data.user);
+                setEditForm({
+                    fullname: data.data.user.fullname || "",
+                    phone:    data.data.user.phone    || "",
+                    college:  data.data.user.college  || "",
+                    bio:      data.data.user.bio      || "",
+                });
+            } catch {}
+            finally { setLoading(false); }
+        };
+        fetch();
+    }, []);
 
-  const fetchAllData = async () => {
-    if (!user?.token) return;
-    try {
-      setLoading(true);
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.token}`
-      };
+    // ── Load tab data ─────────────────────────────────────────────────────
+    const refreshTab = async (tab) => {
+        setTabLoading(true);
+        try {
+            let data;
+            if (tab === "listings")  data = await userAPI.getMyListings();
+            if (tab === "purchases") data = await userAPI.getPurchaseHistory();
+            if (tab === "sales")     data = await userAPI.getSalesHistory();
+            if (tab === "incoming")  data = await orderAPI.getIncoming();
+            setTabData(data?.data?.products || data?.data?.orders || []);
+        } catch { setTabData([]); }
+        finally { setTabLoading(false); }
+    };
 
-      const [profileRes, productsRes, transRes] = await Promise.all([
-        fetch('http://localhost:5000/api/users/profile', { headers }),
-        fetch('http://localhost:5000/api/users/myproducts', { headers }),
-        fetch('http://localhost:5000/api/users/orderHistory', { headers })
-      ]);
+    useEffect(() => { refreshTab(activeTab); }, [activeTab]);
 
-      const profileData = await profileRes.json();
-      const productsData = await productsRes.json();
-      const transData = await transRes.json();
+    // ── Save profile edits ────────────────────────────────────────────────
+    const handleSaveProfile = async () => {
+        setSaving(true); setEditError("");
+        try {
+            const data = await userAPI.editProfile(editForm);
+            setProfile(data.data.user);
+            updateUser(data.data.user);
+            setEditing(false);
+        } catch (err) { setEditError(err.message); }
+        finally { setSaving(false); }
+    };
 
-      setProfile(profileData);
-      setMyProducts(Array.isArray(productsData) ? productsData : []);
-      setTransaction(Array.isArray(transData.orders) ? transData.orders : (Array.isArray(transData) ? transData : []));
+    // ── Avatar upload ─────────────────────────────────────────────────────
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setAvatarUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("avatar", file);
+            const data = await userAPI.updateAvatar(fd);
+            setProfile(prev => ({ ...prev, avatar: data.data.avatar }));
+            updateUser({ avatar: data.data.avatar });
+        } catch (err) { alert(err.message); }
+        finally { setAvatarUploading(false); }
+    };
 
-    } catch (err) {
-      console.error("Critical fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAllData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.token]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" size={48} />
-      </div>
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center">
+            <Loader2 size={36} className="animate-spin" style={{ color: "var(--c-accent)" }} />
+        </div>
     );
-  }
 
-  if (!profile) return <div className="text-center py-20 font-bold text-gray-500">Profile not found.</div>;
-  
-  return (
-    <div className="bg-gray-50 min-h-screen py-10 px-4">
-      <div className="max-w-5xl mx-auto space-y-8">
-        
-        {/* VIEW LOGIC: Profile Edit vs Product Edit vs Header */}
-        {isEditing ? (
-          <EditProfilePage 
-            initialData={profile} 
-            onCancel={() => setIsEditing(false)} 
-            onUpdateSuccess={() => {
-              setIsEditing(false);
-              fetchAllData(); 
-            }} 
-          />
-        ) : editingProduct ? (
-          <EditItemInline 
-            item={editingProduct} 
-            token={user.token}
-            onCancel={() => setEditingProduct(null)} 
-            onUpdateSuccess={() => {
-              setEditingProduct(null);
-              fetchAllData();
-            }}
-          />
-        ) : (
-          <>
-            {/* Profile Header Card */}
-            <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="relative">
-                  <div className="w-32 h-32 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
-                    <img 
-                      src={profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.name}`} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+    if (!profile) return (
+        <div className="min-h-screen flex items-center justify-center">
+            <p style={{ color: "var(--c-ink-light)" }}>Could not load profile.</p>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen py-10 px-4" style={{ background: "var(--c-surface)" }}>
+            <div className="max-w-5xl mx-auto space-y-6">
+
+                {/* ── Profile Card ── */}
+                <div className="card p-8 animate-fade-up">
+                    <div className="flex flex-col md:flex-row gap-6 items-start">
+
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                            <div className="w-24 h-24 rounded-2xl overflow-hidden"
+                                style={{ background: "var(--c-accent-light)" }}>
+                                {profile.avatar
+                                    ? <img src={profile.avatar} className="w-full h-full object-cover" alt="avatar" />
+                                    : <div className="w-full h-full flex items-center justify-center"
+                                        style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "2rem", color: "var(--c-accent)" }}>
+                                        {(profile.fullname || profile.username || "U")[0].toUpperCase()}
+                                      </div>
+                                }
+                            </div>
+                            <button onClick={() => avatarRef.current.click()}
+                                disabled={avatarUploading}
+                                className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center border-2"
+                                style={{ background: "var(--c-accent)", borderColor: "var(--c-white)" }}>
+                                {avatarUploading
+                                    ? <Loader2 size={12} className="animate-spin text-white" />
+                                    : <Camera size={12} className="text-white" />
+                                }
+                            </button>
+                            <input type="file" ref={avatarRef} hidden accept="image/*" onChange={handleAvatarChange} />
+                        </div>
+
+                        {/* Info / Edit form */}
+                        <div className="flex-1 min-w-0">
+                            {editing ? (
+                                <div className="space-y-4 animate-fade-in">
+                                    {editError && <Alert type="error" msg={editError} />}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <InputField label="Full Name"  value={editForm.fullname} onChange={v => setEditForm(f=>({...f, fullname:v}))} />
+                                        <InputField label="Phone"      value={editForm.phone}    onChange={v => setEditForm(f=>({...f, phone:v}))}    placeholder="10-digit number" />
+                                        <InputField label="College"    value={editForm.college}  onChange={v => setEditForm(f=>({...f, college:v}))}  />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label style={{ fontSize:"0.75rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Bio</label>
+                                        <textarea rows={2} className="input resize-none text-sm" value={editForm.bio}
+                                            onChange={e => setEditForm(f=>({...f, bio:e.target.value}))} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleSaveProfile} disabled={saving}
+                                            className="btn-primary flex items-center gap-2 text-sm">
+                                            {saving ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>} Save
+                                        </button>
+                                        <button onClick={() => setEditing(false)} className="btn-ghost text-sm">Cancel</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="animate-fade-in">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h1 style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"1.6rem", color:"var(--c-ink)" }}>
+                                                {profile.fullname || profile.username}
+                                            </h1>
+                                            <p style={{ fontSize:"0.8rem", fontFamily:"var(--font-display)", fontWeight:600, color:"var(--c-accent)", textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                                                @{profile.username}
+                                            </p>
+                                        </div>
+                                        <button onClick={() => setEditing(true)} className="btn-ghost flex items-center gap-2 text-sm shrink-0">
+                                            <Edit3 size={14}/> Edit
+                                        </button>
+                                    </div>
+                                    {profile.bio && (
+                                        <p className="mt-3" style={{ fontSize:"0.875rem", color:"var(--c-ink-light)", lineHeight:1.6 }}>
+                                            {profile.bio}
+                                        </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
+                                        <InfoItem icon={<Mail size={13}/>}     text={profile.email} />
+                                        {profile.phone   && <InfoItem icon={<Phone size={13}/>}   text={profile.phone} />}
+                                        {profile.college && <InfoItem icon={<MapPin size={13}/>}   text={profile.college} />}
+                                        <InfoItem icon={<Calendar size={13}/>} text={`Joined ${new Date(profile.createdAt).toLocaleDateString("en-IN",{month:"long",year:"numeric"})}`} />
+                                    </div>
+                                    <div className="flex gap-6 mt-6 pt-6 border-t" style={{ borderColor:"var(--c-border)" }}>
+                                        <Stat label="Listed"  value={profile.totalListings  || "—"} />
+                                        <Stat label="Rating"  value={profile.averageRating > 0 ? `⭐ ${profile.averageRating}` : "—"} />
+                                        <Stat label="Reviews" value={profile.totalRatings   || 0} />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex-1 space-y-4">
-                  <div className="flex justify-between items-start">
+                {/* ── Tabs ── */}
+                <div className="flex gap-1 p-1 rounded-2xl w-fit overflow-x-auto" style={{ background:"var(--c-border)" }}>
+                    {TABS.map(tab => (
+                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap"
+                            style={{
+                                fontFamily:"var(--font-display)",
+                                background: activeTab === tab.key ? "var(--c-white)" : "transparent",
+                                color:      activeTab === tab.key ? "var(--c-ink)"   : "var(--c-ink-light)",
+                                boxShadow:  activeTab === tab.key ? "var(--shadow-card)" : "none",
+                            }}>
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* ── Tab Content ── */}
+                <div className="animate-fade-in">
+                    {tabLoading ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 size={28} className="animate-spin" style={{ color:"var(--c-accent)" }} />
+                        </div>
+                    ) : tabData.length === 0 ? (
+                        <div className="card p-12 text-center">
+                            <p style={{ color:"var(--c-ink-light)", fontSize:"0.9rem" }}>Nothing here yet.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {activeTab === "listings"  && tabData.map(p => (
+                                <ListingRow key={p._id} product={p} onRefresh={() => refreshTab("listings")} />
+                            ))}
+                            {activeTab === "purchases" && tabData.map(o => (
+                                <OrderRow key={o._id} order={o} tab="purchases" onRefresh={() => refreshTab("purchases")} />
+                            ))}
+                            {activeTab === "sales"     && tabData.map(o => (
+                                <OrderRow key={o._id} order={o} tab="sales" onRefresh={() => refreshTab("sales")} />
+                            ))}
+                            {activeTab === "incoming"  && tabData.map(o => (
+                                <IncomingRow key={o._id} order={o} onRefresh={() => refreshTab("incoming")} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LISTING ROW — with Edit and Delete
+// ─────────────────────────────────────────────────────────────────────────────
+const ListingRow = ({ product, onRefresh }) => {
+    const [editing, setEditing]       = useState(false);
+    const [deleting, setDeleting]     = useState(false);
+    const [saving, setSaving]         = useState(false);
+    const [editForm, setEditForm]     = useState({
+        title:             product.title,
+        description:       product.description || "",
+        price:             product.price,
+        category:          product.category,
+        condition:         product.condition,
+        rentalPricePerDay: product.rentalPricePerDay || "",
+    });
+    const [editError, setEditError] = useState("");
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        setSaving(true); setEditError("");
+        try {
+            await productAPI.update(product._id, {
+                ...editForm,
+                price: parseFloat(editForm.price),
+                rentalPricePerDay: editForm.rentalPricePerDay ? parseFloat(editForm.rentalPricePerDay) : undefined,
+            });
+            setEditing(false);
+            onRefresh();
+        } catch (err) { setEditError(err.message); }
+        finally { setSaving(false); }
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm(`Delete "${product.title}"? This cannot be undone.`)) return;
+        setDeleting(true);
+        try {
+            await productAPI.delete(product._id);
+            onRefresh();
+        } catch (err) { alert(err.message); }
+        finally { setDeleting(false); }
+    };
+
+    return (
+        <div className="card overflow-hidden">
+            {/* ── Collapsed view ── */}
+            <div className="p-5 flex gap-4 items-center">
+                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0" style={{ background:"var(--c-surface)" }}>
+                    <img src={product.images?.[0] || "https://via.placeholder.com/100"} className="w-full h-full object-cover" alt="" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold truncate" style={{ fontFamily:"var(--font-display)", color:"var(--c-ink)", fontSize:"0.9rem" }}>
+                            {product.title}
+                        </h3>
+                        <span className={`badge ${product.isSold ? "badge-gray" : "badge-green"}`}>
+                            {product.isSold ? "Sold" : "Active"}
+                        </span>
+                        {product.listingType === "rent" && (
+                            <span className="badge badge-amber">Rent</span>
+                        )}
+                    </div>
+                    <p style={{ fontFamily:"var(--font-display)", fontWeight:700, color:"var(--c-accent)", fontSize:"1.05rem" }}>
+                        ₹{product.price.toLocaleString()}
+                        {product.listingType === "rent" && product.rentalPricePerDay && (
+                            <span style={{ fontSize:"0.7rem", fontWeight:500, color:"var(--c-ink-light)" }}>
+                                {" "}· ₹{product.rentalPricePerDay}/day
+                            </span>
+                        )}
+                    </p>
+                    <p style={{ fontSize:"0.75rem", color:"var(--c-ink-light)" }}>
+                        {product.category} · {product.condition} · {new Date(product.createdAt).toLocaleDateString("en-IN")}
+                    </p>
+                </div>
+
+                {/* Action buttons — only on active, unsold listings */}
+                {!product.isSold && (
+                    <div className="flex gap-2 shrink-0">
+                        <button onClick={() => setEditing(!editing)}
+                            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
+                            style={{ background: editing ? "var(--c-accent)" : "var(--c-surface)", color: editing ? "white" : "var(--c-ink-light)" }}
+                            title="Edit listing">
+                            <Pencil size={14} />
+                        </button>
+                        <button onClick={handleDelete} disabled={deleting}
+                            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-red-50"
+                            style={{ background: "var(--c-surface)", color: "var(--c-red)" }}
+                            title="Delete listing">
+                            {deleting ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>}
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Inline Edit Form ── */}
+            {editing && (
+                <form onSubmit={handleUpdate}
+                    className="border-t px-5 pb-5 pt-4 space-y-4 animate-slide-down"
+                    style={{ borderColor:"var(--c-border)", background:"var(--c-surface)" }}>
+                    <p style={{ fontSize:"0.75rem", fontWeight:700, color:"var(--c-ink)", fontFamily:"var(--font-display)" }}>
+                        Edit Listing
+                    </p>
+
+                    {editError && <Alert type="error" msg={editError} />}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2 space-y-1">
+                            <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Title</label>
+                            <input className="input text-sm" value={editForm.title}
+                                onChange={e => setEditForm(f=>({...f, title:e.target.value}))} required />
+                        </div>
+                        <div className="space-y-1">
+                            <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Category</label>
+                            <select className="input text-sm" value={editForm.category}
+                                onChange={e => setEditForm(f=>({...f, category:e.target.value}))}>
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Condition</label>
+                            <select className="input text-sm" value={editForm.condition}
+                                onChange={e => setEditForm(f=>({...f, condition:e.target.value}))}>
+                                {CONDITIONS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Price (₹)</label>
+                            <input type="number" min="0" className="input text-sm" value={editForm.price}
+                                onChange={e => setEditForm(f=>({...f, price:e.target.value}))} required />
+                        </div>
+                        {product.listingType === "rent" && (
+                            <div className="space-y-1">
+                                <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Rent/day (₹)</label>
+                                <input type="number" min="0" className="input text-sm" value={editForm.rentalPricePerDay}
+                                    onChange={e => setEditForm(f=>({...f, rentalPricePerDay:e.target.value}))} />
+                            </div>
+                        )}
+                        <div className="col-span-2 space-y-1">
+                            <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Description</label>
+                            <textarea rows={3} className="input text-sm resize-none" value={editForm.description}
+                                onChange={e => setEditForm(f=>({...f, description:e.target.value}))} />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button type="submit" disabled={saving}
+                            className="btn-primary text-xs py-2 flex items-center gap-1.5">
+                            {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
+                            Save Changes
+                        </button>
+                        <button type="button" onClick={() => setEditing(false)} className="btn-ghost text-xs py-2">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            )}
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORDER ROW — purchase history & sales history with review support
+// ─────────────────────────────────────────────────────────────────────────────
+const OrderRow = ({ order, tab, onRefresh }) => {
+    const [showReview, setShowReview]   = useState(false);
+    const [rating, setRating]           = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [comment, setComment]         = useState("");
+    const [submitting, setSubmitting]   = useState(false);
+    const [reviewDone, setReviewDone]   = useState(false);
+    const [reviewError, setReviewError] = useState("");
+
+    const canReview = tab === "purchases" && order.status === "completed";
+
+    const handleReview = async (e) => {
+        e.preventDefault();
+        if (rating === 0) return setReviewError("Please select a star rating.");
+        setSubmitting(true); setReviewError("");
+        try {
+            await userAPI.submitReview({ orderId: order._id, rating, comment });
+            setReviewDone(true);
+            setShowReview(false);
+        } catch (err) { setReviewError(err.message); }
+        finally { setSubmitting(false); }
+    };
+
+    const isRental = order.orderType === "rental";
+
+    return (
+        <div className="card overflow-hidden">
+            <div className="p-5 flex gap-4 items-start">
+                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0" style={{ background:"var(--c-surface)" }}>
+                    <img src={order.product?.images?.[0] || "https://via.placeholder.com/100"} className="w-full h-full object-cover" alt="" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                        <div>
+                            <h3 className="font-semibold" style={{ fontFamily:"var(--font-display)", color:"var(--c-ink)", fontSize:"0.9rem" }}>
+                                {order.product?.title || "Deleted Product"}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`badge ${statusStyle[order.status]}`}>{order.status}</span>
+                                {isRental && <span className="badge badge-amber">Rental</span>}
+                            </div>
+                        </div>
+                        <p style={{ fontFamily:"var(--font-display)", fontWeight:700, color:"var(--c-accent)", fontSize:"1rem", shrink:0 }}>
+                            ₹{order.totalAmount?.toLocaleString()}
+                        </p>
+                    </div>
+
+                    <p className="mt-1" style={{ fontSize:"0.75rem", color:"var(--c-ink-light)" }}>
+                        {tab === "purchases"
+                            ? <>Seller: <strong style={{ color:"var(--c-ink)" }}>{order.seller?.username}</strong></>
+                            : <>Buyer: <strong style={{ color:"var(--c-ink)" }}>{order.buyer?.username}</strong></>
+                        }
+                        {" · "}{new Date(order.createdAt).toLocaleDateString("en-IN")}
+                    </p>
+
+                    {/* Rental dates summary */}
+                    {isRental && order.rentalStartDate && (
+                        <p className="mt-1" style={{ fontSize:"0.72rem", color:"var(--c-ink-light)" }}>
+                            📅 {new Date(order.rentalStartDate).toLocaleDateString("en-IN")} →{" "}
+                            {new Date(order.rentalEndDate).toLocaleDateString("en-IN")}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {/* Review section — only for completed purchases */}
+            {canReview && !reviewDone && (
+                <div className="border-t px-5 pb-5 pt-4" style={{ borderColor:"var(--c-border)" }}>
+                    {!showReview ? (
+                        <button onClick={() => setShowReview(true)}
+                            className="flex items-center gap-1.5 text-xs font-semibold transition-all"
+                            style={{ color:"var(--c-accent)", fontFamily:"var(--font-display)" }}>
+                            <Star size={13}/> Leave a Review
+                        </button>
+                    ) : (
+                        <form onSubmit={handleReview} className="space-y-3 animate-fade-in">
+                            <p style={{ fontSize:"0.8rem", fontWeight:700, color:"var(--c-ink)", fontFamily:"var(--font-display)" }}>
+                                Rate your experience with {order.seller?.username}
+                            </p>
+
+                            {/* Star Rating */}
+                            <div className="flex gap-1">
+                                {[1,2,3,4,5].map(star => (
+                                    <button key={star} type="button"
+                                        onMouseEnter={() => setHoverRating(star)}
+                                        onMouseLeave={() => setHoverRating(0)}
+                                        onClick={() => setRating(star)}
+                                        style={{ fontSize:"1.6rem", cursor:"pointer", transition:"transform 0.1s",
+                                            transform: (hoverRating||rating) >= star ? "scale(1.15)" : "scale(1)" }}>
+                                        {(hoverRating || rating) >= star ? "⭐" : "☆"}
+                                    </button>
+                                ))}
+                                {rating > 0 && (
+                                    <span className="ml-2 self-center" style={{ fontSize:"0.75rem", color:"var(--c-ink-light)" }}>
+                                        {["","Poor","Fair","Good","Great","Excellent"][rating]}
+                                    </span>
+                                )}
+                            </div>
+
+                            <textarea rows={2} className="input text-sm resize-none"
+                                placeholder="Describe your experience (optional)..."
+                                value={comment}
+                                onChange={e => setComment(e.target.value)} />
+
+                            {reviewError && <p style={{ fontSize:"0.75rem", color:"var(--c-red)" }}>{reviewError}</p>}
+
+                            <div className="flex gap-2">
+                                <button type="submit" disabled={submitting}
+                                    className="btn-primary text-xs py-2 flex items-center gap-1.5">
+                                    {submitting ? <Loader2 size={12} className="animate-spin"/> : <Star size={12}/>}
+                                    Submit Review
+                                </button>
+                                <button type="button" onClick={() => setShowReview(false)} className="btn-ghost text-xs py-2">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            )}
+
+            {/* Review submitted confirmation */}
+            {reviewDone && (
+                <div className="border-t px-5 py-3 flex items-center gap-2" style={{ borderColor:"var(--c-border)", background:"#F0FDF4" }}>
+                    <CheckCircle size={14} style={{ color:"var(--c-green)" }}/>
+                    <p style={{ fontSize:"0.78rem", color:"var(--c-green)", fontWeight:600 }}>Review submitted!</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INCOMING ROW — seller view with accept / complete / cancel
+// ─────────────────────────────────────────────────────────────────────────────
+const IncomingRow = ({ order, onRefresh }) => {
+    const [acting, setActing]       = useState(false);
+    const [showForm, setShowForm]   = useState(false);
+    const [meetup, setMeetup]       = useState({ meetupLocation:"", meetupTime:"" });
+
+    const handleAccept = async () => {
+        if (!meetup.meetupLocation || !meetup.meetupTime) return alert("Please fill meetup details.");
+        setActing(true);
+        try {
+            await orderAPI.accept(order._id, meetup);
+            onRefresh();
+        } catch (err) { alert(err.message); }
+        finally { setActing(false); }
+    };
+
+    const handleReject = async () => {
+        if (!window.confirm("Decline this request?")) return;
+        setActing(true);
+        try {
+            await orderAPI.cancel(order._id, { cancelReason:"Seller declined" });
+            onRefresh();
+        } catch (err) { alert(err.message); }
+        finally { setActing(false); }
+    };
+
+    const handleComplete = async () => {
+        const msg = order.orderType === "rental"
+            ? "Confirm the item has been returned by the buyer?\n\nThis will mark the rental as complete and free up the listing."
+            : "Confirm you have exchanged the item and received payment?\n\nThis will mark the product as SOLD.";
+        if (!window.confirm(msg)) return;
+        setActing(true);
+        try {
+            await orderAPI.complete(order._id);
+            onRefresh();
+        } catch (err) { alert(err.message); }
+        finally { setActing(false); }
+    };
+
+    const handleCancelConfirmed = async () => {
+        const reason = window.prompt("Reason for cancelling (optional):");
+        if (reason === null) return;
+        setActing(true);
+        try {
+            await orderAPI.cancel(order._id, { cancelReason: reason || "Seller cancelled" });
+            onRefresh();
+        } catch (err) { alert(err.message); }
+        finally { setActing(false); }
+    };
+
+    const isRental = order.orderType === "rental";
+
+    return (
+        <div className="card p-5 space-y-4">
+            {/* Order info */}
+            <div className="flex gap-4 items-start">
+                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0" style={{ background:"var(--c-surface)" }}>
+                    <img src={order.product?.images?.[0] || "https://via.placeholder.com/100"} className="w-full h-full object-cover" alt="" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold" style={{ fontFamily:"var(--font-display)", color:"var(--c-ink)", fontSize:"0.9rem" }}>
+                            {order.product?.title}
+                        </h3>
+                        <div className="flex gap-1 shrink-0">
+                            <span className={`badge ${statusStyle[order.status]}`}>{order.status}</span>
+                            {isRental && <span className="badge badge-amber">Rental</span>}
+                        </div>
+                    </div>
+                    <p style={{ fontFamily:"var(--font-display)", fontWeight:700, color:"var(--c-accent)" }}>
+                        ₹{order.totalAmount?.toLocaleString()}
+                    </p>
+                    <p style={{ fontSize:"0.78rem", color:"var(--c-ink-light)" }}>
+                        From: <strong style={{ color:"var(--c-ink)" }}>{order.buyer?.username}</strong>
+                        {order.buyer?.college && ` · ${order.buyer.college}`}
+                        {order.buyer?.phone && (
+                            <span style={{ color:"var(--c-accent)", marginLeft:6 }}>📞 {order.buyer.phone}</span>
+                        )}
+                    </p>
+                    {/* Rental dates */}
+                    {isRental && order.rentalStartDate && (
+                        <p style={{ fontSize:"0.72rem", color:"var(--c-ink-light)", marginTop:2 }}>
+                            📅 {new Date(order.rentalStartDate).toLocaleDateString("en-IN")} →{" "}
+                            {new Date(order.rentalEndDate).toLocaleDateString("en-IN")}
+                        </p>
+                    )}
+                    {order.buyerNote && (
+                        <p className="mt-1 px-2 py-1 rounded-lg" style={{ fontSize:"0.75rem", color:"var(--c-ink-light)", fontStyle:"italic", background:"var(--c-surface)" }}>
+                            "{order.buyerNote}"
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {/* Meetup info after acceptance */}
+            {order.status === "confirmed" && order.meetupLocation && (
+                <div className="p-3 rounded-xl" style={{ background:"var(--c-accent-light)", border:"1px solid var(--c-accent-dim)" }}>
+                    <p style={{ fontSize:"0.75rem", fontWeight:700, color:"var(--c-accent)", fontFamily:"var(--font-display)", marginBottom:4 }}>
+                        📍 Meetup Set
+                    </p>
+                    <p style={{ fontSize:"0.8rem", color:"var(--c-accent)" }}>{order.meetupLocation}</p>
+                    {order.meetupTime && (
+                        <p style={{ fontSize:"0.78rem", color:"var(--c-accent)" }}>
+                            🕐 {new Date(order.meetupTime).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"})}
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* ── PENDING actions ── */}
+            {order.status === "pending" && (
+                showForm ? (
+                    <div className="space-y-2 p-3 rounded-xl animate-fade-in" style={{ background:"var(--c-surface)" }}>
+                        <p style={{ fontSize:"0.75rem", fontWeight:700, color:"var(--c-ink)", fontFamily:"var(--font-display)" }}>
+                            Set meetup details:
+                        </p>
+                        <input className="input text-sm" placeholder="Location (e.g. Library Gate 2)"
+                            value={meetup.meetupLocation}
+                            onChange={e => setMeetup(m=>({...m, meetupLocation:e.target.value}))} />
+                        <input className="input text-sm" type="datetime-local"
+                            value={meetup.meetupTime}
+                            onChange={e => setMeetup(m=>({...m, meetupTime:e.target.value}))} />
+                        <div className="flex gap-2">
+                            <button onClick={handleAccept} disabled={acting}
+                                className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5">
+                                {acting ? <Loader2 size={12} className="animate-spin"/> : <CheckCircle size={12}/>}
+                                Confirm & Send Meetup
+                            </button>
+                            <button onClick={() => setShowForm(false)} className="btn-ghost text-xs py-2">Back</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex gap-2">
+                        <button onClick={() => setShowForm(true)}
+                            className="btn-primary text-xs py-2.5 flex-1 flex items-center justify-center gap-1.5">
+                            <CheckCircle size={13}/> Accept & Set Meetup
+                        </button>
+                        <button onClick={handleReject} disabled={acting}
+                            className="text-xs py-2.5 px-4 rounded-xl font-semibold transition-all flex items-center gap-1.5"
+                            style={{ background:"#FEF2F2", color:"var(--c-red)", fontFamily:"var(--font-display)" }}>
+                            <XCircle size={13}/> Decline
+                        </button>
+                    </div>
+                )
+            )}
+
+            {/* ── CONFIRMED actions ── */}
+            {order.status === "confirmed" && (
+                <div className="space-y-2">
+                    <p style={{ fontSize:"0.75rem", color:"var(--c-ink-light)", fontStyle:"italic" }}>
+                        {isRental
+                            ? "Once the buyer returns the item, mark the rental as complete."
+                            : "Once you've handed over the item and received payment, mark as complete."}
+                    </p>
+                    <div className="flex gap-2">
+                        <button onClick={handleComplete} disabled={acting}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-semibold text-xs transition-all"
+                            style={{ fontFamily:"var(--font-display)", background:"var(--c-green)", color:"white" }}>
+                            {acting ? <Loader2 size={13} className="animate-spin"/> : <CheckCircle size={13}/>}
+                            {isRental ? "Mark Rental Complete" : "Mark as Completed"}
+                        </button>
+                        <button onClick={handleCancelConfirmed} disabled={acting}
+                            className="px-4 py-2.5 rounded-xl font-semibold text-xs"
+                            style={{ fontFamily:"var(--font-display)", background:"#FEF2F2", color:"var(--c-red)" }}>
+                            Cancel Deal
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── COMPLETED ── */}
+            {order.status === "completed" && (
+                <div className="flex items-center gap-2 p-3 rounded-xl"
+                    style={{ background:"#F0FDF4", border:"1px solid #BBF7D0" }}>
+                    <CheckCircle size={16} style={{ color:"var(--c-green)" }}/>
                     <div>
-                      <h1 className="text-3xl font-bold text-gray-900">{profile.name}</h1>
-                      <p className="text-blue-600 mt-1 font-bold uppercase text-xs tracking-widest italic">{profile.role}</p>
+                        <p style={{ fontSize:"0.8rem", fontWeight:700, color:"var(--c-green)", fontFamily:"var(--font-display)" }}>
+                            {isRental ? "Rental complete!" : "Deal completed!"}
+                        </p>
+                        <p style={{ fontSize:"0.72rem", color:"var(--c-green)" }}>
+                            {isRental ? "Listing available again for future rentals" : "Product marked as sold"}
+                            {" · "}Completed on {new Date(order.completedAt || order.updatedAt).toLocaleDateString("en-IN")}
+                        </p>
                     </div>
-                    <button 
-                      className="flex items-center gap-2 px-4 py-2 border rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all" 
-                      onClick={() => setIsEditing(true)}
-                    >
-                      <Edit3 size={16} /> Edit Profile
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm text-gray-500 font-medium">
-                    <div className="flex items-center gap-2"><Mail size={16} className="text-gray-400"/> {profile.email}</div>
-                    <div className="flex items-center gap-2"><Phone size={16} className="text-gray-400"/> {profile.phone || "No phone added"}</div>
-                    <div className="flex items-center gap-2"><MapPin size={16} className="text-gray-400"/> {profile.address || "No address added"}</div>
-                    <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-gray-400"/> 
-                        Joined {new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                    </div>
-                  </div>
                 </div>
-              </div>
+            )}
 
-              <div className="grid grid-cols-3 gap-4 mt-10 pt-8 border-t border-gray-50 text-center">
-                <div><h4 className="text-2xl font-black text-blue-600">{myProducts.length}</h4><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Listed Items</p></div>
-                <div><h4 className="text-2xl font-black text-blue-600">{myProducts.filter(p => p.isSold).length}</h4><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Items Sold</p></div>
-                <div><h4 className="text-2xl font-black text-blue-600">{transaction.length}</h4><p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Purchases</p></div>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-2 bg-gray-200/50 p-1 rounded-2xl w-fit">
-              <button onClick={() => setActiveTab('listings')} className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'listings' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Package size={18} /> My Listings</button>
-              <button onClick={() => setActiveTab('transactions')} className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'transactions' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}><Clock size={18} /> Transactions</button>
-            </div>
-
-            {/* Content Area */}
-            <div className="space-y-4">
-              {activeTab === 'listings' ? (
-                <div className="space-y-4">
-                  {myProducts.length > 0 ? (
-                    myProducts.map(p => (
-                      <ListingCard 
-                        key={p._id} 
-                        title={p.title} 
-                        price={p.price} 
-                        status={p.isSold ? 'sold' : 'active'} 
-                        image={p.images?.[0]} 
-                        id={p._id} 
-                        onDelete={handleDelete} 
-                        onEdit={() => handleEdit(p)} // Pass whole object
-                      />
-                    ))
-                  ) : (
-                    <div className="text-center p-12 bg-white rounded-3xl border border-dashed text-gray-400 font-medium">You haven't listed anything yet.</div>
-                  )}
+            {/* ── CANCELLED ── */}
+            {order.status === "cancelled" && (
+                <div className="p-3 rounded-xl" style={{ background:"#FEF2F2", border:"1px solid #FEE2E2" }}>
+                    <p style={{ fontSize:"0.78rem", color:"var(--c-red)" }}>
+                        <strong>Cancelled</strong>{order.cancelReason && ` — ${order.cancelReason}`}
+                    </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {transaction.length > 0 ? (
-                    transaction.map((t, i) => <TransactionItem key={t._id || i} type="purchased" title={t.product?.title || "Deleted Product"} amount={`$${t.product?.price || 0}`} date={ new Date(t.created_at).toLocaleDateString()} party={t.seller?.name || "N/A"} />)
-                  ) : (
-                    <div className="text-center p-12 bg-white rounded-3xl border border-dashed text-gray-400 font-medium">No transactions found.</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+            )}
+        </div>
+    );
 };
 
-// --- SUB-COMPONENTS ---
-
-const EditItemInline = ({ item, token, onCancel, onUpdateSuccess }) => {
-  const [formData, setFormData] = useState({
-    title: item.title,
-    price: item.price,
-    description: item.description || ''
-  });
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const res = await fetch(`http://localhost:5000/api/users/ItemEdit/${item._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert("Product updated!");
-        onUpdateSuccess();
-      } else {
-        alert(data.message);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error updating product");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-3xl border-2 border-blue-100 p-8 shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900">Edit Listing</h2>
-          <p className="text-gray-400 text-sm font-medium mt-1">Update your product information</p>
-        </div>
-        <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <X size={24} className="text-gray-400" />
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Title</label>
-            <input 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Price (₹)</label>
-            <input 
-              type="number"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold"
-              value={formData.price}
-              onChange={(e) => setFormData({...formData, price: e.target.value})}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Description</label>
-          <textarea 
-            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
-            rows="4"
-            value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
-          />
-        </div>
-
-        <div className="flex gap-4 pt-4">
-          <button 
-            type="submit" 
-            disabled={submitting}
-            className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-50"
-          >
-            {submitting ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-            Save Product Changes
-          </button>
-          <button 
-            type="button" 
-            onClick={onCancel}
-            className="px-8 py-4 border-2 border-gray-100 rounded-2xl font-black text-gray-500 hover:bg-gray-50 transition-all"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+// ── Small reusable components ─────────────────────────────────────────────────
+const InputField = ({ label, value, onChange, placeholder }) => (
+    <div className="space-y-1">
+        <label style={{ fontSize:"0.75rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>{label}</label>
+        <input className="input text-sm" value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
     </div>
-  );
-};
-
-const ListingCard = ({ title, price, status, image, id, onDelete, onEdit }) => (
-  <div className="bg-white p-6 rounded-3xl border border-gray-100 flex gap-6 items-center hover:shadow-md transition-shadow">
-    <div className="w-24 h-24 bg-gray-100 rounded-2xl overflow-hidden shrink-0">
-      <img 
-        src={image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=150"} 
-        alt={title} 
-        className="w-full h-full object-cover" 
-      />
-    </div>
-    <div className="flex-1">
-      <div className="flex justify-between items-start">
-        <h3 className="font-bold text-lg text-gray-900">{title}</h3>
-        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${status === 'active' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-          {status}
-        </span>
-      </div>
-      <p className="text-blue-600 font-black text-xl mt-1">₹{price}</p>
-      {status === 'active' && (
-        <div className="flex gap-4 mt-4">
-          <button className="text-xs font-bold text-gray-500 bg-gray-50 px-4 py-2 rounded-lg hover:bg-gray-100 flex items-center gap-1" onClick={onEdit}><Edit3 size={14}/> Edit</button>
-          <button className="text-xs font-bold text-red-500 bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 flex items-center gap-1" onClick={(e) => onDelete(e, id)}><Trash2 size={14}/> Delete</button>
-        </div>
-      )}
-    </div>
-  </div>
 );
 
-const TransactionItem = ({ type, title, amount, date, party }) => (
-  <div className="bg-white p-5 rounded-2xl border border-gray-100 flex justify-between items-center group hover:border-blue-200 transition-all">
-    <div className="flex items-center gap-4">
-      <div className={`p-3 rounded-xl ${type === 'sold' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
-        <ShoppingBag size={20} />
-      </div>
-      <div>
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${type === 'sold' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>{type}</span>
-          <h4 className="font-bold text-gray-900">{title}</h4>
-        </div>
-        <p className="text-xs text-gray-400 mt-1">{type === 'sold' ? 'Buyer' : 'Seller'}: {party} • {date}</p>
-      </div>
+const InfoItem = ({ icon, text }) => (
+    <div className="flex items-center gap-1.5" style={{ fontSize:"0.825rem", color:"var(--c-ink-light)" }}>
+        <span>{icon}</span> {text}
     </div>
-    <div className="text-right">
-      <p className="font-black text-lg text-gray-900">{amount}</p>
-      <span className="text-[10px] font-bold text-gray-400 border px-2 py-0.5 rounded-md flex items-center gap-1 mt-1">
-        <CheckCircle2 size={10} className="text-green-500"/> completed
-      </span>
+);
+
+const Stat = ({ label, value }) => (
+    <div>
+        <p style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"1.25rem", color:"var(--c-ink)" }}>{value}</p>
+        <p style={{ fontSize:"0.7rem", fontWeight:600, color:"var(--c-ink-light)", textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</p>
     </div>
-  </div>
 );
 
 export default ProfilePage;
