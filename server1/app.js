@@ -3,6 +3,8 @@
 // Keeping these separate makes testing easier — you can import app without
 // actually starting the server
 // ─────────────────────────────────────────────────────────────────────────────
+import dotenv from 'dotenv'
+dotenv.config()
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -12,6 +14,7 @@ import authRoutes from "./src/routes/auth.routes.js";
 import userRoutes from "./src/routes/user.routes.js";
 import productRoutes from "./src/routes/product.routes.js";
 import orderRoutes from "./src/routes/order.routes.js";
+import aiRoutes from "./src/routes/ai.routes.js"
 
 const app = express();
 
@@ -32,7 +35,7 @@ app.use("/api/v2/auth", authRoutes);
 app.use("/api/v2/users", userRoutes);
 app.use("/api/v2/products", productRoutes);
 app.use("/api/v2/orders", orderRoutes);
-
+app.use("/api/v2/ai",aiRoutes);
 //  Health Check 
 app.get("/api/v2/health", (req, res) => {
     res.status(200).json({ status: "ok", message: "Campus Marketplace API is running" });
