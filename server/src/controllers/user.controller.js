@@ -2,8 +2,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { Order } from "../models/Order.model.js";
-import { Product } from "../models/Product.model.js";
+import { Order } from "../models/order.model.js";
+import { Product } from "../models/product.model.js";
 import { Review } from "../models/review.model.js";
 import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
@@ -13,19 +13,30 @@ import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js
 // req.user is set by verifyJWT middleware
 // ─────────────────────────────────────────────────────────────────────────────
 const getMyProfile = asyncHandler(async (req, res) => {
-    // req.user already has the user from middleware — just clean up sensitive fields
-    // We re-fetch to ensure we have the latest data with proper field exclusions
-    const user = await User.findById(req.user._id).select(
-        "-password -refreshToken -emailVerificationOTP -emailVerificationOTPExpiry -passwordResetOTP -passwordResetOTPExpiry -avatarPublicId"
-    );
+    // Fetch user and compute live stats in parallel for performance
+    const [user, totalListings, activeListings] = await Promise.all([
+        User.findById(req.user._id).select(
+            "-password -refreshToken -emailVerificationOTP -emailVerificationOTPExpiry -passwordResetOTP -passwordResetOTPExpiry -avatarPublicId"
+        ),
+        // Total products this user has ever listed (not deleted)
+        Product.countDocuments({ seller: req.user._id }),
+        // Currently active (unsold) listings
+        Product.countDocuments({ seller: req.user._id, isSold: false }),
+    ]);
 
     if (!user) {
         throw new ApiError(404, "User not found");
     }
 
+    // Attach computed stats to the response without saving to DB
+    // (averageRating and totalRatings are already on the model, updated by submitReview)
+    const userObj = user.toObject();
+    userObj.totalListings  = totalListings;
+    userObj.activeListings = activeListings;
+
     return res
         .status(200)
-        .json(new ApiResponse(200, { user }, "Profile fetched successfully"));
+        .json(new ApiResponse(200, { user: userObj }, "Profile fetched successfully"));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,11 +149,11 @@ const removeAvatar = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "Avatar removed successfully"));
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // CHANGE PASSWORD
 // Requires current password confirmation — prevents unauthorized changes
 // if someone gets access to an already-logged-in session
-
+// ─────────────────────────────────────────────────────────────────────────────
 const changePassword = asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
@@ -176,10 +187,11 @@ const changePassword = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "Password changed successfully. Please login again."));
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // MY LISTINGS
 // Returns all products listed by the logged-in user with pagination
 // Supports filter by status: all | active (unsold) | sold
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getMyListings = asyncHandler(async (req, res) => {
     const { status = "all", page = 1, limit = 10 } = req.query;
 
@@ -218,11 +230,11 @@ const getMyListings = asyncHandler(async (req, res) => {
     );
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // PURCHASE HISTORY
 // Orders where the logged-in user is the buyer
 // Populates product and seller info so frontend can display useful details
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getPurchaseHistory = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -254,10 +266,10 @@ const getPurchaseHistory = asyncHandler(async (req, res) => {
     );
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // SALES HISTORY
 // Orders where the logged-in user is the seller
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getSalesHistory = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -289,9 +301,10 @@ const getSalesHistory = asyncHandler(async (req, res) => {
     );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ACTIVE RENTALS
 // Orders where user is buyer OR seller, orderType is rental, and not yet ended
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getActiveRentals = asyncHandler(async (req, res) => {
     const now = new Date();
 
@@ -311,11 +324,11 @@ const getActiveRentals = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, { rentals }, "Active rentals fetched successfully"));
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC PROFILE
 // Visible to anyone — shows safe public info only
 // Used when browsing seller profiles or clicking on a seller's name
-// 
+// ─────────────────────────────────────────────────────────────────────────────
 const getPublicProfile = asyncHandler(async (req, res) => {
     const { username } = req.params;
 
@@ -328,32 +341,42 @@ const getPublicProfile = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
-    // Also fetch their active (unsold) listings for the profile page
-    const listings = await Product.find({ seller: user._id, isSold: false })
-        .select("title images price category condition listingType createdAt")
-        .sort({ createdAt: -1 })
-        .limit(6);  // Show latest 6 on profile — full list has its own endpoint
+    // Run all data fetches in parallel for performance
+    const [listings, reviews, totalListings, activeListings] = await Promise.all([
+        // Latest 6 active listings for preview
+        Product.find({ seller: user._id, isSold: false })
+            .select("title images price category condition listingType rentalPricePerDay createdAt")
+            .sort({ createdAt: -1 })
+            .limit(6),
+        // Latest 10 reviews for this seller
+        Review.find({ seller: user._id })
+            .populate("reviewer", "username fullname avatar")
+            .sort({ createdAt: -1 })
+            .limit(10),
+        // Real total listing count (not capped at 6)
+        Product.countDocuments({ seller: user._id }),
+        // Active listing count
+        Product.countDocuments({ seller: user._id, isSold: false }),
+    ]);
 
-    // Fetch recent reviews received by this seller
-    const reviews = await Review.find({ seller: user._id })
-        .populate("reviewer", "username fullname avatar")
-        .sort({ createdAt: -1 })
-        .limit(5);  // Show latest 5 reviews
+    const userObj = user.toObject();
+    userObj.totalListings  = totalListings;
+    userObj.activeListings = activeListings;
 
     return res.status(200).json(
         new ApiResponse(
             200,
-            { user, listings, reviews },
+            { user: userObj, listings, reviews },
             "Public profile fetched successfully"
         )
     );
 });
 
-// 
+// ─────────────────────────────────────────────────────────────────────────────
 // SUBMIT REVIEW
 // Buyer can review a seller after an order is completed
 // One review per order — enforced by unique index on Review model
-
+// ─────────────────────────────────────────────────────────────────────────────
 const submitReview = asyncHandler(async (req, res) => {
     const { orderId, rating, comment } = req.body;
 
@@ -413,10 +436,10 @@ const submitReview = asyncHandler(async (req, res) => {
         .json(new ApiResponse(201, { review }, "Review submitted successfully"));
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // GET REVIEWS FOR A SELLER
 // Public — anyone can view a seller's reviews
-
+// ─────────────────────────────────────────────────────────────────────────────
 const getSellerReviews = asyncHandler(async (req, res) => {
     const { username } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -453,11 +476,11 @@ const getSellerReviews = asyncHandler(async (req, res) => {
     );
 });
 
-
+// ─────────────────────────────────────────────────────────────────────────────
 // DELETE ACCOUNT (Soft Delete)
 // Sets isDeleted:true — never hard-delete because orders reference this user's _id
 // Also soft-deletes all their active listings
-
+// ─────────────────────────────────────────────────────────────────────────────
 const deleteAccount = asyncHandler(async (req, res) => {
     const { password } = req.body;
 
