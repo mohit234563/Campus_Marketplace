@@ -1,3 +1,4 @@
+// import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
@@ -9,6 +10,7 @@ import HomePage from "./pages/HomePage";
 import SellItemPage from "./pages/SellItemPage";
 import ProfilePage from "./pages/ProfilePage";
 import OrdersPage from "./pages/OrdersPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 
 // Redirect to /login if not authenticated
 const Protected = ({ children }) => {
@@ -39,6 +41,9 @@ function AppRoutes() {
                 <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
                 <Route path="/my-listings" element={<Protected><ProfilePage defaultTab="listings" /></Protected>} />
                 <Route path="/orders" element={<Protected><OrdersPage /></Protected>} />
+
+                {/* Public seller profile — no auth needed */}
+                <Route path="/u/:username" element={<PublicProfilePage />} />
 
                 {/* Catch all */}
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,5 +1,5 @@
 import  { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 // eslint-disable-next-line no-unused-vars
 import { Search, SlidersHorizontal, Plus, Loader2, ShoppingBag, Tag, Clock, User, ChevronLeft, Star, BookOpen, Laptop, Sofa, Shirt, Pen, Dumbbell, Package } from "lucide-react";
 import { productAPI, orderAPI } from "../services/api";
@@ -35,8 +35,9 @@ const HomePage = () => {
     const [sort, setSort] = useState("newest");
     const [page, setPage] = useState(1);
     const [filtersOpen, setFiltersOpen] = useState(false);
-     const { user } = useAuth();
+
     const navigate = useNavigate();
+    const { user } = useAuth(); // Needed for AI chat widget visibility check
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -367,7 +368,7 @@ const ProductCard = ({ product }) => {
                                 Cancel
                             </button>
                             <button type="submit" disabled={ordering}
-                                className="btn-primary flex-2 text-sm py-2.5 flex items-center justify-center gap-2">
+                                className="btn-primary flex-[2] text-sm py-2.5 flex items-center justify-center gap-2">
                                 {ordering
                                     ? <><Loader2 size={14} className="animate-spin" /> Sending...</>
                                     : <><ShoppingBag size={14} /> Send Request</>
@@ -379,7 +380,7 @@ const ProductCard = ({ product }) => {
             </div>
         )}
 
-        <div className="h-95" style={{ perspective: "1000px" }}>
+        <div className="h-[380px]" style={{ perspective: "1000px" }}>
             <div className="relative w-full h-full transition-all duration-500"
                 style={{ transformStyle: "preserve-3d", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
 
@@ -454,8 +455,10 @@ const ProductCard = ({ product }) => {
                             ₹{product.price.toLocaleString()}
                         </p>
 
-                        {/* Seller */}
-                        <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: "var(--c-surface)" }}>
+                        {/* Seller — links to public profile */}
+                        <Link to={`/u/${product.seller?.username}`}
+                            className="flex items-center gap-2 p-2.5 rounded-xl transition-all hover:bg-blue-50"
+                            style={{ background: "var(--c-surface)", textDecoration: "none" }}>
                             <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center"
                                 style={{ background: "var(--c-accent-light)" }}>
                                 {product.seller?.avatar
@@ -464,7 +467,7 @@ const ProductCard = ({ product }) => {
                                 }
                             </div>
                             <div>
-                                <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--c-ink)" }}>
+                                <p style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--c-accent)" }}>
                                     {product.seller?.fullname || product.seller?.username}
                                 </p>
                                 <p style={{ fontSize: "0.65rem", color: "var(--c-ink-light)" }}>
@@ -474,7 +477,7 @@ const ProductCard = ({ product }) => {
                                     )}
                                 </p>
                             </div>
-                        </div>
+                        </Link>
 
                         <p style={{ fontSize: "0.8rem", color: "var(--c-ink-light)", lineHeight: 1.6 }}
                             className="line-clamp-3">
