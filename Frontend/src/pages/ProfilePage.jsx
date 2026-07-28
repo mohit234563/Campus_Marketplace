@@ -35,7 +35,7 @@ const CONDITIONS  = ["new","like-new","good","fair","poor"];
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE PAGE
 // ─────────────────────────────────────────────────────────────────────────────
-const ProfilePage = () => {
+const Profilepage = () => {
     // eslint-disable-next-line no-unused-vars
     const { user, updateUser } = useAuth();
     const [profile, setProfile]       = useState(null);
@@ -787,4 +787,4 @@ const Stat = ({ label, value }) => (
     </div>
 );
 
-export default ProfilePage;
+export default Profilepage;

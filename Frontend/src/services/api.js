@@ -4,7 +4,7 @@
 // Automatically attaches auth token and handles token refresh on 401.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BASE_URL = "http://localhost:3005/api/v2";
+const BASE_URL = " https://campus-marketplace-73rs.onrender.com/api/v2";
 
 // Get token from localStorage (set on login)
 const getToken = () => localStorage.getItem("accessToken");
