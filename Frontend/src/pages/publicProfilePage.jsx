@@ -13,7 +13,7 @@ import {
 // Shows seller's public info, active listings, and reviews received.
 // Route: /u/:username
 // ─────────────────────────────────────────────────────────────────────────────
-const PublicprofilePage = () => {
+const Publicprofilepage = () => {
     const { username } = useParams();
     const navigate = useNavigate();
     const [data, setData]       = useState(null);
@@ -273,4 +273,4 @@ const EmptyState = ({ icon, msg }) => (
     </div>
 );
 
-export default PublicprofilePage;
+export default Publicprofilepage;
