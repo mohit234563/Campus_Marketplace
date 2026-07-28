@@ -10,7 +10,7 @@ import HomePage from "./pages/HomePage";
 import SellItemPage from "./pages/SellItemPage";
 import ProfilePage from "./pages/ProfilePage";
 import OrdersPage from "./pages/OrdersPage";
-import Publicprofilepage from "./pages/Publicprofilepage.jsx";
+import PublicProfilePage from "./pages/PublicProfilePage.jsx";
 
 // Redirect to /login if not authenticated
 const Protected = ({ children }) => {
@@ -43,7 +43,7 @@ function AppRoutes() {
                 <Route path="/orders" element={<Protected><OrdersPage /></Protected>} />
 
                 {/* Public seller profile — no auth needed */}
-                <Route path="/u/:username" element={<Publicprofilepage />} />
+               <Route path="/u/:username" element={<PublicProfilePage />} />
 
                 {/* Catch all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
