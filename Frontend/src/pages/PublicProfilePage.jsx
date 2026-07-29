@@ -57,7 +57,7 @@ const Publicprofilepage = () => {
                 </button>
 
                 {/* ── Profile Card ── */}
-                <div className="card p-8 animate-fade-up">
+                <div className="card p-5 sm:p-8 animate-fade-up">
                     <div className="flex flex-col sm:flex-row gap-6 items-start">
 
                         {/* Avatar */}
@@ -99,7 +99,7 @@ const Publicprofilepage = () => {
                             </div>
 
                             {/* Stats */}
-                            <div className="flex gap-8 mt-6 pt-5 border-t" style={{ borderColor: "var(--c-border)" }}>
+                            <div className="grid grid-cols-3 sm:flex flex-wrap gap-4 sm:gap-8 mt-6 pt-5 border-t" style={{ borderColor: "var(--c-border)" }}>
                                 <StatBlock
                                     label="Total Listed"
                                     value={user.totalListings ?? listings.length}
@@ -267,7 +267,7 @@ const StatBlock = ({ label, value, icon, sub }) => (
 );
 
 const EmptyState = ({ icon, msg }) => (
-    <div className="card p-12 text-center">
+    <div className="card p-6 sm:p-12 text-center">
         <div className="mx-auto mb-3" style={{ color: "var(--c-border)" }}>{icon}</div>
         <p style={{ color: "var(--c-ink-light)", fontSize: "0.9rem" }}>{msg}</p>
     </div>

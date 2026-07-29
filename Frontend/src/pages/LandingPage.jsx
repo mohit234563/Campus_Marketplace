@@ -95,18 +95,18 @@ const LandingPage = () => {
                     </div>
 
                     {/* Stats */}
-                    <div className="flex justify-center gap-12 mt-16 pt-10 border-t"
+                    <div className="grid grid-cols-3 gap-3 sm:flex sm:justify-center sm:gap-12 mt-16 pt-10 border-t"
                         style={{ borderColor: "rgba(255,255,255,0.08)" }}>
                         {[
                             { value: stats.users, label: "Active Students" },
                             { value: stats.active, label: "Live Listings" },
                             { value: stats.sold, label: "Items Sold" },
                         ].map((s, i) => (
-                            <div key={i} className="text-center">
-                                <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "2rem", color: "white" }}>
+                            <div key={i} className="text-center min-w-0">
+                                <p style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "clamp(1.3rem, 5vw, 2rem)", color: "white" }}>
                                     {s.value.toLocaleString()}+
                                 </p>
-                                <p style={{ fontSize: "0.82rem", color: "#6B7280", marginTop: 2 }}>{s.label}</p>
+                                <p style={{ fontSize: "clamp(0.68rem, 2.5vw, 0.82rem)", color: "#6B7280", marginTop: 2 }}>{s.label}</p>
                             </div>
                         ))}
                     </div>
@@ -123,7 +123,7 @@ const LandingPage = () => {
                         Find exactly what you need
                     </p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                     {[
                         { label: "Books", icon: "📚", color: "#EFF6FF" },
                         { label: "Electronics", icon: "💻", color: "#F0FDF4" },
@@ -133,10 +133,10 @@ const LandingPage = () => {
                         { label: "Stationery", icon: "✏️", color: "#FFFBEB" },
                     ].map(cat => (
                         <Link key={cat.label} to={`/home?category=${cat.label.toLowerCase()}`}
-                            className="flex flex-col items-center gap-3 p-6 rounded-2xl border text-center transition-all hover:shadow-md hover:-translate-y-1"
+                            className="flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 rounded-2xl border text-center transition-all hover:shadow-md hover:-translate-y-1"
                             style={{ background: cat.color, borderColor: "var(--c-border)", textDecoration: "none" }}>
-                            <span style={{ fontSize: "2rem" }}>{cat.icon}</span>
-                            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "0.875rem", color: "var(--c-ink)" }}>
+                            <span style={{ fontSize: "clamp(1.5rem, 6vw, 2rem)" }}>{cat.icon}</span>
+                            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "clamp(0.75rem, 3vw, 0.875rem)", color: "var(--c-ink)" }}>
                                 {cat.label}
                             </span>
                         </Link>
@@ -152,7 +152,7 @@ const LandingPage = () => {
                             How It Works
                         </h2>
                     </div>
-                    <div className="grid md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-6">
                         {[
                             { step: "01", title: "Register", desc: "Sign up with your campus email and verify it." },
                             { step: "02", title: "Browse or List", desc: "Find what you need or post what you want to sell." },

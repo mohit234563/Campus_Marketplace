@@ -105,7 +105,7 @@ const SignupPage = () => {
                         {error && <Alert type="error" msg={error} />}
 
                         <form onSubmit={handleRegister} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Field label="Username" icon={<User size={16} />}>
                                     <input name="username" required placeholder="johndoe"
                                         className="input pl-10" value={form.username} onChange={handleChange} />

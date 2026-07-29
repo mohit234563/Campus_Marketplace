@@ -86,7 +86,7 @@ const SellItemPage = () => {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="card p-8 space-y-6">
+                <form onSubmit={handleSubmit} className="card p-5 sm:p-8 space-y-6">
 
                     {/* Title */}
                     <Field label="Item Title *" icon={<Tag size={15} />}>
@@ -95,7 +95,7 @@ const SellItemPage = () => {
                     </Field>
 
                     {/* Category + Condition */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label style={{ fontSize: "0.825rem", fontWeight: 600, color: "var(--c-ink)", fontFamily: "var(--font-display)" }}>
                                 Category *
@@ -138,7 +138,7 @@ const SellItemPage = () => {
                     </div>
 
                     {/* Price */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label={form.listingType === "rent" ? "Security Deposit (₹)" : "Price (₹) *"}
                             icon={<IndianRupee size={15} />}>
                             <input name="price" type="number" min="0" required

@@ -63,7 +63,7 @@ const AIChatWidget = ({ productContext = null }) => {
         <>
             {/* ── Floating Button ── */}
             <button onClick={() => setOpen(!open)}
-                className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200"
+                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200"
                 style={{ background: open ? "var(--c-ink)" : "var(--c-accent)" }}
                 aria-label="AI Assistant">
                 {open ? <X size={20} className="text-white" /> : <MessageCircle size={20} className="text-white" />}
@@ -76,9 +76,11 @@ const AIChatWidget = ({ productContext = null }) => {
 
             {/* ── Chat Panel ── */}
             {open && (
-                <div className="fixed bottom-24 right-6 z-50 flex flex-col rounded-3xl overflow-hidden animate-fade-up"
+                <div className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-24 sm:right-6 sm:w-[360px] z-50 flex flex-col rounded-3xl overflow-hidden animate-fade-up"
                     style={{
-                        width: 360, height: 520,
+                        maxWidth: 360,
+                        height: "min(520px, 70vh)",
+                        marginLeft: "auto",
                         background: "var(--c-white)",
                         border: "1px solid var(--c-border)",
                         boxShadow: "0 24px 80px rgba(0,0,0,0.15)",
