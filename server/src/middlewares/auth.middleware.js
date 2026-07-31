@@ -35,7 +35,7 @@ const verifyJWT = asyncHandler(async (req, _, next) => {
 
     // Attach user to request object — all downstream controllers can use req.user
     req.user = user;
-    next();
+    next;
 });
 
 export { verifyJWT };

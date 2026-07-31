@@ -41,15 +41,15 @@ const generateAccessAndRefreshTokens = async (userId) => {
         await user.save({ validateBeforeSave: false });
  
         return { accessToken, refreshToken };
-    } catch (err) {
-        // Let ApiErrors bubble up with their original message
-        // Only wrap truly unknown errors in a generic 500
-        if (err instanceof ApiError) throw err;
-        throw new ApiError(
-            500,
-            "Something went wrong while generating access and refresh tokens"
-        );
-    }
+    }  catch (err) {
+    if (err instanceof ApiError) throw err;
+    console.error("generateAccessAndRefreshTokens failed:", err); // ADD THIS LINE
+    throw new ApiError(
+        500,
+        "Something went wrong while generating access and refresh tokens"
+    );
+
+}
 };
 
 // REGISTER
@@ -435,6 +435,6 @@ export {
     logoutUser,
     refreshAccessToken,
     forgotPassword,
-    resetPassword,
+    resetPassword
 };
  
