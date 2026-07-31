@@ -1,0 +1,72 @@
+[33m4b30825[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m brevo settings
+[33mcf0d627[m final changes
+[33ma47b3ef[m more responsive version of frontend
+[33m25d0275[m fix aitool casting
+[33m4759d53[m last check
+[33m17da25f[m Fix PublicProfilePage import casing
+[33m08efda0[m rename issues
+[33m82fbbd3[m resolve deployment issue
+[33m94868b1[m rename the file
+[33mcdbead7[m refactor: update README for clarity and enhance user.controller.js for performance
+[33m96260aa[m add public profile page and update routing for seller profiles
+[33m07d304e[m shift the website on the new server conpletely
+[33m9ca23f0[m introduce the Ai feature's into backend
+[33m0d59ba9[m add the new Ai apis
+[33mccfbe3a[m add Ai features to home and sells page
+[33mf87eb33[m add the components for Ai integration
+[33m95c6f39[m update the controller with rental logic as when rentaed no one can send by req at that time
+[33md3b9e4f[m update the controller for rate limit mail sending
+[33m18ebd71[m update the email services with rental timelines and total cost
+[33maf05255[m added the remaining things
+[33m6817e26[m update the sellItem page with some buttons
+[33m1f28ff0[m update the profile page with edit and delete logic of items
+[33mf30d8e7[m update the Home page with some rental logics
+[33mc2486e0[m update the order page
+[33md68e7b0[m update the login page
+[33m3ac58aa[m add the auhtContext
+[33m8c61f9c[m add the remaining things
+[33m6c43c9b[m add the CSS file
+[33m041cda1[m add the APi services
+[33mc4004b1[m add all the pages of frontend
+[33me76770c[m add component and context files
+[33m0c7ac2e[m add the initial setup and the app and main.jsx
+[33m8b2f0cf[m update the order controller according to the new email service
+[33m53349a3[m set the email structure
+[33m9d46265[m resolve the database URI issue
+[33mbe3e7e1[m add profile review fucntionlity with model
+[33m25b0314[m add the app and index files
+[33mc3e5731[m add the opt generator
+[33m445f0df[m add order related functionality
+[33m8846fc0[m add the product related functionality
+[33m603bf19[m add user controllers and cloudinary utility
+[33mdab140e[m add middleware as auth and multer
+[33mac11815[m add mail services
+[33m99b3da5[m added the auth functionalities
+[33mf0f3705[m Implement product listing feature with image upload and JWT authentication
+[33mf028f22[m add register and logic logics
+[33m7cd0fc9[m add some dependency
+[33mdbca006[m add the basic setup like utillity files
+[33m23565d8[m Fix LinkedIn link formatting in README
+[33mc8ac0c0[m Update LinkedIn link in README
+[33mc107a05[m Revise README with detailed project information
+[33mbb4b691[m Update README with server and frontend instructions
+[33me578165[m Add project description to README.md
+[33m2921d44[m update the statics
+[33m1dc45d5[m added some remaining fucntionality
+[33mc7c55da[m added edited main.jsx
+[33m275f210[m added full functional edit pages
+[33m0bdf5de[m added full functional home page
+[33m2b71442[m added full functional signup page
+[33m93faf1c[m added styles for animation
+[33m6576dd8[m added full functional sell item page
+[33mdda0e0f[m added full functional landing page
+[33m6d3db60[m add full functional login page
+[33m9e0487b[m added the full functional profile page
+[33m58ca804[m added the basic frontent structure without backend connection
+[33m2511fa7[m check and correct some issues
+[33m5e1c0ba[m added the edit profile and edit item functionality
+[33m2165fb8[m added profile getting api
+[33mca17b04[m added the logic for counting the users
+[33m59e99f7[m added login logic
+[33m09c9d92[m adding the initial backend with the signup logic
+[33m748cc05[m added the frontend initialy
