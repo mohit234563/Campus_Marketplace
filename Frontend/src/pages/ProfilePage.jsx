@@ -134,7 +134,7 @@ const Profilepage = () => {
             <div className="max-w-5xl mx-auto space-y-6">
 
                 {/* ── Profile Card ── */}
-                <div className="card p-8 animate-fade-up">
+                <div className="card p-5 sm:p-8 animate-fade-up">
                     <div className="flex flex-col md:flex-row gap-6 items-start">
 
                         {/* Avatar */}
@@ -166,7 +166,7 @@ const Profilepage = () => {
                             {editing ? (
                                 <div className="space-y-4 animate-fade-in">
                                     {editError && <Alert type="error" msg={editError} />}
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <InputField label="Full Name"  value={editForm.fullname} onChange={v => setEditForm(f=>({...f, fullname:v}))} />
                                         <InputField label="Phone"      value={editForm.phone}    onChange={v => setEditForm(f=>({...f, phone:v}))}    placeholder="10-digit number" />
                                         <InputField label="College"    value={editForm.college}  onChange={v => setEditForm(f=>({...f, college:v}))}  />
@@ -186,9 +186,9 @@ const Profilepage = () => {
                                 </div>
                             ) : (
                                 <div className="animate-fade-in">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <h1 style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"1.6rem", color:"var(--c-ink)" }}>
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <h1 className="break-words" style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"clamp(1.25rem, 5vw, 1.6rem)", color:"var(--c-ink)" }}>
                                                 {profile.fullname || profile.username}
                                             </h1>
                                             <p style={{ fontSize:"0.8rem", fontFamily:"var(--font-display)", fontWeight:600, color:"var(--c-accent)", textTransform:"uppercase", letterSpacing:"0.05em" }}>
@@ -210,7 +210,7 @@ const Profilepage = () => {
                                         {profile.college && <InfoItem icon={<MapPin size={13}/>}   text={profile.college} />}
                                         <InfoItem icon={<Calendar size={13}/>} text={`Joined ${new Date(profile.createdAt).toLocaleDateString("en-IN",{month:"long",year:"numeric"})}`} />
                                     </div>
-                                    <div className="flex gap-6 mt-6 pt-6 border-t" style={{ borderColor:"var(--c-border)" }}>
+                                    <div className="grid grid-cols-2 sm:flex flex-wrap gap-x-6 gap-y-4 mt-6 pt-6 border-t" style={{ borderColor:"var(--c-border)" }}>
                                         <Stat label="Total Listed"  value={profile.totalListings  ?? "—"} />
                                         <Stat label="Active"        value={profile.activeListings ?? "—"} />
                                         <Stat label="Rating"        value={profile.averageRating > 0 ? `⭐ ${profile.averageRating}` : "—"} />
@@ -245,7 +245,7 @@ const Profilepage = () => {
                             <Loader2 size={28} className="animate-spin" style={{ color:"var(--c-accent)" }} />
                         </div>
                     ) : tabData.length === 0 ? (
-                        <div className="card p-12 text-center">
+                        <div className="card p-6 sm:p-12 text-center">
                             <p style={{ color:"var(--c-ink-light)", fontSize:"0.9rem" }}>Nothing here yet.</p>
                         </div>
                     ) : (
@@ -374,7 +374,7 @@ const ListingRow = ({ product, onRefresh }) => {
 
                     {editError && <Alert type="error" msg={editError} />}
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="col-span-2 space-y-1">
                             <label style={{ fontSize:"0.72rem", fontWeight:600, color:"var(--c-ink-light)", fontFamily:"var(--font-display)" }}>Title</label>
                             <input className="input text-sm" value={editForm.title}

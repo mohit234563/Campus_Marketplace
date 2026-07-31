@@ -29,7 +29,6 @@ const ForgotPasswordPage = () => {
             await authAPI.forgotPassword({ email });
             setSuccess("If an account exists with this email, an OTP has been sent.");
             setStep("reset");
-        // eslint-disable-next-line no-unused-vars
         } catch (err) {
             // Still move to reset step — backend always returns 200 for security
             setStep("reset");

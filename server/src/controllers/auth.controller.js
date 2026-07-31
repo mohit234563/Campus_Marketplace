@@ -13,8 +13,11 @@ import jwt from "jsonwebtoken";
 
 const cookieOptions = () => ({
     httpOnly: true,
+    // sameSite:"none" is required for cookies to be set when frontend and
+    // backend are on different domains (e.g. Vercel + Render) — this REQUIRES
+    // secure:true, which in turn requires the site to be served over HTTPS.
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days — matches refresh token expiry
 });
 

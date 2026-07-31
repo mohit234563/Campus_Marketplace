@@ -1,32 +1,37 @@
-import nodemailer from "nodemailer";
-
 // ─────────────────────────────────────────────────────────────────────────────
-// TRANSPORTER
-// Single shared instance — reused across all sends in the same request.
-// Using one transporter instead of creating a new one per email prevents
-// the "Too many emails per second" error on Mailtrap free plan.
+// BREVO HTTP API SENDER
+// Render's free-tier web services block outbound traffic on SMTP ports
+// (25, 465, 587) as of Sep 2025, so nodemailer's SMTP transport can never
+// connect there. Brevo's transactional email API sends over plain HTTPS
+// instead, which isn't affected by that restriction.
+//
+// Needs BREVO_API_KEY in env — this is DIFFERENT from SMTP_PASS. Generate it
+// in Brevo under Settings → SMTP & API → API Keys tab (not the SMTP tab).
 // ─────────────────────────────────────────────────────────────────────────────
-let _transporter = null;
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
-const getTransporter = () => {
-    if (!_transporter) {
-        _transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT, 10) || 587,
-            secure: process.env.SMTP_SECURE === "true",
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-            // Pool connections — reuses SMTP connection instead of opening a new
-            // one per email. This is the main fix for the rate limit error.
-            pool: true,
-            maxConnections: 1,
-            rateDelta: 1000,    // Min 1 second between emails
-            rateLimit: 1,       // Max 1 email per rateDelta window
-        });
+const sendEmail = async ({ to, subject, html }) => {
+    const res = await fetch(BREVO_API_URL, {
+        method: "POST",
+        headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "api-key": process.env.BREVO_API_KEY,
+        },
+        body: JSON.stringify({
+            sender: { name: "CampusMarket", email: process.env.SMTP_FROM },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+        }),
+    });
+
+    if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Brevo email send failed (${res.status}): ${body}`);
     }
-    return _transporter;
+
+    return res.json();
 };
 
 // Small delay helper — used between back-to-back emails (e.g. buyer + seller)
@@ -171,8 +176,7 @@ const sendVerificationOTP = async ({ to, name, otp }) => {
         <p style="font-size:13px; color:#9CA3AF;">If you didn't create an account, you can safely ignore this email.</p>
     `);
 
-    await getTransporter().sendMail({
-        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
         to, subject: "🔐 Verify your email — CampusMarket", html,
     });
 };
@@ -187,8 +191,7 @@ const sendWelcomeEmail = async ({ to, name }) => {
         <p>You can now browse listings, post your own items for sale or rent, and connect with fellow students on campus.</p>
     `);
 
-    await getTransporter().sendMail({
-        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
         to, subject: "🎓 Welcome to CampusMarket!", html,
     });
 };
@@ -207,8 +210,7 @@ const sendPasswordResetOTP = async ({ to, name, otp }) => {
         <p style="font-size:13px; color:#9CA3AF;">If you didn't request this, ignore this email. Your password won't change.</p>
     `);
 
-    await getTransporter().sendMail({
-        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
         to, subject: "🔑 Password reset OTP — CampusMarket", html,
     });
 };
@@ -335,8 +337,7 @@ const sendOrderConfirmation = async ({
         "seller-confirmed": isRental ? `🤝 You accepted the rental — ${product.title}` : `🤝 You accepted — ${product.title}`,
     };
 
-    await getTransporter().sendMail({
-        from: `"CampusMarket" <${process.env.SMTP_FROM}>`,
+    await sendEmail({
         to,
         subject: subjects[role] || `Order update — ${product.title}`,
         html,
