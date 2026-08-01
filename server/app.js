@@ -1,8 +1,7 @@
-// ─────────────────────────────────────────────────────────────────────────────
 // app.js — Express app setup (separate from server startup in index.js)
 // Keeping these separate makes testing easier — you can import app without
 // actually starting the server
-// ─────────────────────────────────────────────────────────────────────────────
+
 import dotenv from 'dotenv'
 dotenv.config()
 import express from "express";
@@ -21,7 +20,8 @@ const app = express();
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",  // Vite dev server
+    origin: [process.env.CLIENT_URL,
+    "http://localhost:5173"],  // Vite dev server
     credentials: true,          // Required for cookies to be sent cross-origin
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 }));

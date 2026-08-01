@@ -32,10 +32,10 @@ const verifyJWT = asyncHandler(async (req, _, next) => {
     if (!user) {
         throw new ApiError(401, "User not found. Please login again.");
     }
-
+    // console.log("user is verified")
     // Attach user to request object — all downstream controllers can use req.user
     req.user = user;
-    next;
+    next();
 });
 
 export { verifyJWT };
